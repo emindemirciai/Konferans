@@ -1,0 +1,18 @@
+# Optional static LiveKit config example.
+# The main docker-compose.yml uses LIVEKIT_CONFIG so Dokploy can inject env values directly.
+# If you want to mount this file instead, replace devkey/secret and port ranges manually.
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+log_level: info
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+keys:
+  devkey: secret
+room:
+  auto_create: true
+  empty_timeout: 300
+  max_participants: 200

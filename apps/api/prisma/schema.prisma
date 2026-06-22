@@ -1,0 +1,628 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum GlobalRole {
+  USER
+  ADMIN
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+  GUEST
+}
+
+enum MemberStatus {
+  ACTIVE
+  KICKED
+  BANNED
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+}
+
+enum InviteScope {
+  PLATFORM
+  SERVER
+}
+
+enum ScreenShareQuality {
+  LOW
+  BALANCED
+  HIGH
+}
+
+enum PresenceStatus {
+  ONLINE
+  IDLE
+  DO_NOT_DISTURB
+  INVISIBLE
+  OFFLINE
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum ModerationActionType {
+  MUTE
+  UNMUTE
+  DEAFEN
+  UNDEAFEN
+  KICK
+  BAN
+  UNBAN
+}
+
+enum AuditEventType {
+  SERVER_CREATED
+  SERVER_UPDATED
+  CHANNEL_CREATED
+  CHANNEL_UPDATED
+  INVITE_CREATED
+  MEMBER_ROLE_UPDATED
+  MEMBER_MODERATED
+  WIDGET_UPDATED
+  MESSAGE_DELETED
+  MESSAGE_EDITED
+  MESSAGE_REACTION_UPDATED
+  FILE_ATTACHED
+  INTEGRATION_CREATED
+  INTEGRATION_UPDATED
+  WEBHOOK_CREATED
+  WEBHOOK_UPDATED
+  SSO_SESSION_CREATED
+  BACKUP_STARTED
+  BACKUP_COMPLETED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  DIRECT_MESSAGE
+  MENTION
+  SERVER_INVITE
+  MODERATION
+  SYSTEM
+}
+
+enum PushProvider {
+  WEB_PUSH
+  EXPO
+  FCM
+  APNS
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  DISABLED
+  REVOKED
+}
+
+enum BackupStatus {
+  STARTED
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  name            String
+  avatarUrl       String?
+  passwordHash    String?
+  provider        AuthProvider   @default(EMAIL)
+  googleSub       String?        @unique
+  emailVerified   Boolean        @default(false)
+  globalRole      GlobalRole     @default(USER)
+  presenceStatus  PresenceStatus @default(OFFLINE)
+  lastSeenAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  settings                  UserSettings?
+  notificationPreference    NotificationPreference?
+  pushSubscriptions         PushSubscription[]
+  notifications             Notification[]          @relation("NotificationReceiver")
+  notificationActors        Notification[]          @relation("NotificationActor")
+  memberships               ServerMember[]
+  ownedServers              Server[]                @relation("ServerOwner")
+  messages                  Message[]
+  messageReactions          MessageReaction[]
+  files                     FileObject[]            @relation("FileUploader")
+  invites                   Invite[]                @relation("InviteCreator")
+  verificationCodes         VerificationCode[]
+  friendRequestsSent        FriendRequest[]         @relation("FriendRequestSender")
+  friendRequestsReceived    FriendRequest[]         @relation("FriendRequestReceiver")
+  directMessagesSent        DirectMessage[]         @relation("DirectMessageSender")
+  directMessagesReceived    DirectMessage[]         @relation("DirectMessageReceiver")
+  moderationActionsMade     ModerationAction[]      @relation("ModerationActor")
+  moderationActionsOnMe     ModerationAction[]      @relation("ModerationTarget")
+  auditLogs                 AuditLog[]              @relation("AuditActor")
+  ssoSessions               WebsiteSsoSession[]
+  voiceParticipants         VoiceParticipant[]
+}
+
+model UserSettings {
+  id                       String             @id @default(cuid())
+  userId                   String             @unique
+  pushToTalkEnabled         Boolean            @default(false)
+  pushToTalkKey             String             @default("Space")
+  voiceActivationThreshold  Int                @default(-50)
+  lowPowerMode              Boolean            @default(true)
+  performanceMode           Boolean            @default(true)
+  overlayCompactMode        Boolean            @default(true)
+  showOnlyActiveSpeakers    Boolean            @default(false)
+  echoCancellation          Boolean            @default(true)
+  noiseSuppression          Boolean            @default(true)
+  autoGainControl           Boolean            @default(true)
+  inputVolume               Float              @default(1)
+  outputVolume              Float              @default(1)
+  startMuted                Boolean            @default(false)
+  cameraEnabledByDefault    Boolean            @default(false)
+  screenShareQuality        ScreenShareQuality @default(BALANCED)
+  autoJoinLastVoice         Boolean            @default(false)
+  mobileDataSaver           Boolean            @default(true)
+  hardwareAccelerationHint  Boolean            @default(true)
+  animatedUi                Boolean            @default(false)
+  compactOverlayOpacity     Float              @default(0.92)
+  maxIncomingVideoTracks    Int                @default(4)
+  user                      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  directMessages     Boolean  @default(true)
+  mentions           Boolean  @default(true)
+  friendRequests     Boolean  @default(true)
+  moderation         Boolean  @default(true)
+  pushEnabled        Boolean  @default(true)
+  emailEnabled       Boolean  @default(false)
+  quietHoursEnabled  Boolean  @default(false)
+  quietHoursStart    String?  @default("23:00")
+  quietHoursEnd      String?  @default("08:00")
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id          String       @id @default(cuid())
+  userId      String
+  provider    PushProvider
+  endpoint    String?
+  token       String?
+  keys        Json?
+  platform    String?
+  deviceName  String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@index([userId, isActive])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  actorId     String?
+  serverId    String?
+  channelId   String?
+  type        NotificationType
+  title       String
+  body        String?
+  metadata    Json?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation("NotificationReceiver", fields: [userId], references: [id], onDelete: Cascade)
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  server      Server?          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel     Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  userId    String
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, code])
+}
+
+model Server {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  ownerId     String
+  isPublic    Boolean  @default(false)
+  description String?
+  iconUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner               User                @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members             ServerMember[]
+  channels            Channel[]
+  invites             Invite[]
+  bans                ServerBan[]
+  auditLogs           AuditLog[]
+  moderationActions   ModerationAction[]
+  widget              ServerWidget?
+  channelPermissions  ChannelPermission[]
+  files               FileObject[]
+  notifications       Notification[]
+  integrations        IntegrationApp[]
+  webhooks            Webhook[]
+  ssoSessions         WebsiteSsoSession[]
+  voiceSessions       VoiceSession[]
+}
+
+model ServerMember {
+  id                 String       @id @default(cuid())
+  serverId           String
+  userId             String
+  role               MemberRole   @default(MEMBER)
+  status             MemberStatus @default(ACTIVE)
+  nickname           String?
+  customTitle         String?
+  serverMuted         Boolean      @default(false)
+  serverDeafened      Boolean      @default(false)
+  mutedUntil          DateTime?
+  voiceVolume         Float        @default(1)
+  lastVoiceChannelId  String?
+  joinedAt            DateTime     @default(now())
+
+  server             Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@index([userId])
+  @@index([serverId, role])
+}
+
+model Channel {
+  id                  String      @id @default(cuid())
+  serverId            String
+  name                String
+  type                ChannelType
+  category            String?
+  position            Int         @default(0)
+  bitrate             Int         @default(64000)
+  userLimit           Int?
+  isLocked            Boolean     @default(false)
+  allowVideo          Boolean     @default(true)
+  allowScreenShare    Boolean     @default(true)
+  requirePushToTalk   Boolean     @default(false)
+  lowLatencyMode      Boolean     @default(true)
+  slowModeSeconds     Int         @default(0)
+  nsfw                Boolean     @default(false)
+  topic               String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  server              Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  messages            Message[]
+  permissions         ChannelPermission[]
+  files               FileObject[]
+  notifications       Notification[]
+  webhooks            Webhook[]
+  voiceSessions       VoiceSession[]
+
+  @@index([serverId, type])
+}
+
+model ChannelPermission {
+  id                String     @id @default(cuid())
+  serverId          String
+  channelId         String
+  role              MemberRole
+  canView           Boolean    @default(true)
+  canSendMessage    Boolean    @default(true)
+  canJoinVoice      Boolean    @default(true)
+  canPublishVideo   Boolean    @default(true)
+  canShareScreen    Boolean    @default(true)
+  canManageChannel  Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  server            Server     @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel           Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, role])
+  @@index([serverId])
+}
+
+model Message {
+  id          String             @id @default(cuid())
+  channelId   String
+  authorId    String
+  content     String
+  attachments Json?
+  createdAt   DateTime           @default(now())
+  editedAt    DateTime?
+  deletedAt   DateTime?
+
+  channel     Channel            @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions   MessageReaction[]
+  files       FileObject[]
+
+  @@index([channelId, createdAt])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model DirectMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  receiverId  String
+  content     String
+  attachments Json?
+  createdAt   DateTime @default(now())
+  editedAt    DateTime?
+  deletedAt   DateTime?
+
+  sender      User     @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("DirectMessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, senderId, createdAt])
+}
+
+model FriendRequest {
+  id          String              @id @default(cuid())
+  senderId    String
+  receiverId  String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  sender      User                @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User                @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+}
+
+model Invite {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  scope       InviteScope @default(SERVER)
+  serverId    String?
+  createdById String
+  maxUses     Int         @default(25)
+  uses        Int         @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  server      Server?     @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([code])
+}
+
+model ServerBan {
+  id            String   @id @default(cuid())
+  serverId      String
+  userId        String
+  reason        String?
+  createdById   String
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  server        Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@index([userId])
+}
+
+model ModerationAction {
+  id              String               @id @default(cuid())
+  serverId         String
+  actorId          String
+  targetUserId     String
+  type             ModerationActionType
+  reason           String?
+  durationMinutes  Int?
+  expiresAt        DateTime?
+  createdAt        DateTime             @default(now())
+
+  server           Server               @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  actor            User                 @relation("ModerationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  target           User                 @relation("ModerationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, createdAt])
+  @@index([targetUserId])
+}
+
+model AuditLog {
+  id        String         @id @default(cuid())
+  serverId  String
+  actorId   String?
+  event     AuditEventType
+  targetId  String?
+  metadata  Json?
+  createdAt DateTime       @default(now())
+
+  server    Server         @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  actor     User?          @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([serverId, createdAt])
+}
+
+model ServerWidget {
+  id                String   @id @default(cuid())
+  serverId          String   @unique
+  enabled           Boolean  @default(false)
+  allowGuestPreview Boolean  @default(false)
+  defaultChannelId  String?
+  theme             String   @default("dark")
+  requireSso        Boolean  @default(false)
+  allowedOrigins    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  server            Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}
+
+model FileObject {
+  id          String   @id @default(cuid())
+  serverId    String?
+  channelId   String?
+  messageId   String?
+  uploaderId  String
+  name        String
+  url         String
+  storageKey  String?
+  mimeType    String?
+  sizeBytes   Int
+  sha256      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  server      Server?  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel     Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  message     Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  uploader    User     @relation("FileUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, createdAt])
+  @@index([channelId, createdAt])
+}
+
+model IntegrationApp {
+  id               String            @id @default(cuid())
+  serverId         String
+  name             String
+  clientId         String            @unique
+  clientSecretHash String
+  status           IntegrationStatus @default(ACTIVE)
+  allowedOrigins   Json?
+  scopes           Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  server           Server            @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  ssoSessions      WebsiteSsoSession[]
+
+  @@index([serverId, status])
+}
+
+model WebsiteSsoSession {
+  id               String          @id @default(cuid())
+  serverId          String?
+  userId            String
+  integrationAppId  String?
+  oneTimeToken      String          @unique
+  redirectUrl       String?
+  expiresAt         DateTime
+  usedAt            DateTime?
+  createdAt         DateTime        @default(now())
+
+  server            Server?         @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrationApp    IntegrationApp? @relation(fields: [integrationAppId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  serverId    String
+  channelId   String?
+  name        String
+  secretHash  String
+  events      Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel     Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@index([serverId, isActive])
+}
+
+model VoiceSession {
+  id          String   @id @default(cuid())
+  serverId    String
+  channelId   String
+  livekitRoom String
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  metadata    Json?
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  participants VoiceParticipant[]
+
+  @@index([channelId, startedAt])
+}
+
+model VoiceParticipant {
+  id             String       @id @default(cuid())
+  voiceSessionId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  leftAt         DateTime?
+  durationSeconds Int?
+
+  voiceSession   VoiceSession @relation(fields: [voiceSessionId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, joinedAt])
+}
+
+model AppConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model BackupRun {
+  id         String       @id @default(cuid())
+  scope      String
+  status     BackupStatus
+  filePath   String?
+  error      String?
+  startedAt  DateTime     @default(now())
+  finishedAt DateTime?
+}

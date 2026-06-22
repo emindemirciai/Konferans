@@ -1,0 +1,15 @@
+server {
+  listen 80;
+  server_name meet.example.com;
+  location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+}
+server {
+  listen 80;
+  server_name api-meet.example.com;
+  location / { proxy_pass http://127.0.0.1:4000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
+}
+server {
+  listen 80;
+  server_name livekit.example.com;
+  location / { proxy_pass http://127.0.0.1:7880; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; }
+}

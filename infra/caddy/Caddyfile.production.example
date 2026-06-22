@@ -1,0 +1,11 @@
+meet.example.com {
+  reverse_proxy web:3000
+}
+
+api-meet.example.com {
+  reverse_proxy api:4000
+}
+
+livekit.example.com {
+  reverse_proxy livekit:7880
+}

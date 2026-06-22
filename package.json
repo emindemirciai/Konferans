@@ -1,0 +1,21 @@
+{
+  "name": "lets-meet",
+  "private": true,
+  "version": "0.4.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @lets-meet/api --filter @lets-meet/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "prisma:generate": "pnpm --filter @lets-meet/api prisma:generate",
+    "db:push": "pnpm --filter @lets-meet/api db:push",
+    "db:seed": "pnpm --filter @lets-meet/api db:seed",
+    "check": "pnpm lint && pnpm build",
+    "db:studio": "pnpm --filter @lets-meet/api prisma:studio",
+    "backup:db": "bash scripts/backup-postgres.sh",
+    "restore:db": "bash scripts/restore-postgres.sh"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

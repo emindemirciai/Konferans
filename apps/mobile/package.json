@@ -1,0 +1,30 @@
+{
+  "name": "@lets-meet/mobile",
+  "version": "0.4.0",
+  "private": true,
+  "main": "src/App.tsx",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@livekit/react-native": "^2.9.0",
+    "@livekit/react-native-webrtc": "^125.0.0",
+    "@lets-meet/shared": "workspace:*",
+    "expo": "^53.0.0",
+    "expo-av": "^15.0.0",
+    "expo-dev-client": "^5.0.0",
+    "expo-screen-orientation": "^8.0.0",
+    "livekit-client": "^2.9.0",
+    "react": "^19.0.0",
+    "react-native": "^0.79.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.8",
+    "typescript": "^5.7.0"
+  }
+}

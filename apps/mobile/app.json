@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Let's Meet",
+    "slug": "lets-meet",
+    "scheme": "letsmeet",
+    "version": "0.4.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.letsmeet.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Let's Meet kamera ile görüntülü görüşme için kameraya erişir.",
+        "NSMicrophoneUsageDescription": "Let's Meet sesli görüşme için mikrofona erişir."
+      }
+    },
+    "android": {
+      "package": "com.letsmeet.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "FOREGROUND_SERVICE",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "@livekit/react-native",
+        {}
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:4000",
+      "googleClientId": "replace-with-mobile-client-id"
+    }
+  }
+}
