@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { registerGlobals } from '@livekit/react-native';
-import { LiveKitRoom, VideoConference } from '@livekit/react-native';
+import { LiveKitRoom } from '@livekit/react-native';
 import { api } from './api';
 
 registerGlobals();
@@ -81,7 +81,10 @@ export default function App() {
             <Text style={styles.title}>Ses Odası</Text>
             <Text style={styles.muted}>{voice.policy?.requirePushToTalk ? 'Push-to-talk gerekli' : 'Ses bağlantısı aktif'} · {settings.mobileDataSaver ? 'Veri tasarrufu açık' : 'Tam kalite'}</Text>
           </View>
-          <VideoConference />
+          <View style={styles.voicePanel}>
+            <Text style={styles.rowText}>Canlı ses odasına bağlısın.</Text>
+            <Text style={styles.muted}>Mikrofon ve oda bağlantısı LiveKit üzerinden yönetiliyor.</Text>
+          </View>
           <TouchableOpacity style={styles.dangerButton} onPress={() => setVoice(null)}><Text style={styles.buttonText}>Ayrıl</Text></TouchableOpacity>
         </SafeAreaView>
       </LiveKitRoom>
@@ -161,5 +164,6 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   inviteBox: { gap: 10, marginBottom: 10 },
   voiceHeader: { padding: 16 },
+  voicePanel: { margin: 16, padding: 16, borderRadius: 16, backgroundColor: '#151821', gap: 8 },
   error: { color: '#ff5c7a' }
 });
