@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { DisconnectButton, LiveKitRoom, RoomAudioRenderer, StartAudio, VideoConference, useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
-import { Maximize, MonitorPlay, Minimize } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { LiveKitRoom, RoomAudioRenderer, StartAudio, VideoConference, useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
+import { Maximize, MonitorPlay, Minimize, PhoneOff } from 'lucide-react';
 import { api } from '@/lib/api';
 
 type VoicePolicy = {
@@ -24,40 +24,94 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
   const [error, setError] = useState('');
   const [isCinematic, setIsCinematic] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const joinedRef = useRef(false);
+  const leavingRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const connectRunRef = useRef(0);
 
-  async function join() {
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const connectVoice = useCallback(async () => {
+    const runId = ++connectRunRef.current;
     try {
       setError('');
       const [voiceData, settingsData] = await Promise.all([
         api<VoiceToken>('/livekit/token', { token, method: 'POST', body: JSON.stringify({ channelId: channel.id }) }),
         api<{ settings: Settings }>('/settings', { token }),
       ]);
+      if (connectRunRef.current !== runId || leavingRef.current) return false;
       setVoice(voiceData);
       setSettings(settingsData.settings);
       setConnected(true);
+      reconnectAttemptsRef.current = 0;
+      if (!joinedRef.current) {
+        window.dispatchEvent(new CustomEvent('letsmeet:voice-join', { detail: { channelId: channel.id } }));
+        joinedRef.current = true;
+      }
+      return true;
     } catch (err: any) {
-      setError(err.message);
+      if (connectRunRef.current !== runId || leavingRef.current) return false;
+      setConnected(false);
+      setError(err.message || 'Ses kanalına bağlanılamadı.');
+      return false;
     }
-  }
+  }, [channel.id, token]);
+
+  const leaveChannel = useCallback(() => {
+    leavingRef.current = true;
+    clearReconnectTimer();
+    connectRunRef.current += 1;
+    setConnected(false);
+    setVoice(null);
+    if (joinedRef.current) {
+      window.dispatchEvent(new CustomEvent('letsmeet:voice-leave', { detail: { channelId: channel.id } }));
+      joinedRef.current = false;
+    }
+    window.dispatchEvent(new CustomEvent('letsmeet:leave-channel'));
+  }, [channel.id, clearReconnectTimer]);
+
+  const scheduleReconnect = useCallback(() => {
+    if (leavingRef.current) return;
+    clearReconnectTimer();
+    setConnected(false);
+    setVoice(null);
+    reconnectAttemptsRef.current += 1;
+    const delay = Math.min(1000 * reconnectAttemptsRef.current, 5000);
+    setError('Bağlantı koptu, tekrar bağlanılıyor...');
+    reconnectTimerRef.current = setTimeout(() => {
+      void connectVoice();
+    }, delay);
+  }, [clearReconnectTimer, connectVoice]);
 
   useEffect(() => {
-    let mounted = true;
+    leavingRef.current = false;
+    joinedRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    clearReconnectTimer();
     setVoice(null);
     setConnected(false);
     setError('');
     setIsCinematic(false);
     window.dispatchEvent(new CustomEvent('letsmeet:cinematic-mode', { detail: { active: false } }));
-    
-    // Auto-join
-    join().then(() => {
-      if (mounted) window.dispatchEvent(new CustomEvent('letsmeet:voice-join', { detail: { channelId: channel.id } }));
-    });
+
+    void connectVoice();
     
     return () => {
-      mounted = false;
-      window.dispatchEvent(new CustomEvent('letsmeet:voice-leave', { detail: { channelId: channel.id } }));
+      leavingRef.current = true;
+      clearReconnectTimer();
+      connectRunRef.current += 1;
+      if (joinedRef.current) {
+        window.dispatchEvent(new CustomEvent('letsmeet:voice-leave', { detail: { channelId: channel.id } }));
+        joinedRef.current = false;
+      }
     };
-  }, [channel.id]);
+  }, [channel.id, clearReconnectTimer, connectVoice]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -103,7 +157,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
       video={Boolean(settings.cameraEnabledByDefault && voice.policy.allowVideo)}
       options={{ adaptiveStream: true, dynacast: true }}
       data-lk-theme="default"
-      onDisconnected={() => { setConnected(false); window.dispatchEvent(new CustomEvent('letsmeet:leave-channel')); }}
+      onDisconnected={scheduleReconnect}
       className={`voice ${settings.performanceMode ? 'voice-performance' : ''} ${isCinematic ? 'voice-cinematic' : ''}`}
     >
       <RoomAudioRenderer />
@@ -113,10 +167,16 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', gap: '16px', flex: 1 }}>
           <MonitorPlay size={48} opacity={0.2} />
           <h2>AFK Kanalı</h2>
+          <button className="icon-button" title="Kanaldan ayrıl" aria-label="Kanaldan ayrıl" onClick={leaveChannel}>
+            <PhoneOff size={18} />
+          </button>
         </div>
       ) : (
         <>
           <div className="voice-stage-controls">
+            <button className="icon-button" title="Kanaldan ayrıl" aria-label="Kanaldan ayrıl" onClick={leaveChannel}>
+              <PhoneOff size={18} />
+            </button>
             <button className="icon-button" title="Sinematik Mod (Tüm menüleri gizle)" onClick={toggleCinematic}>
               {isCinematic ? <Minimize size={18} /> : <MonitorPlay size={18} />}
             </button>
@@ -127,14 +187,14 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
           <div className="voice-stage">
             <VideoConference />
           </div>
-          <GameVoiceControls channelId={channel.id} settings={settings} policy={voice.policy} onLeave={() => setConnected(false)} />
+          <GameVoiceControls channelId={channel.id} settings={settings} policy={voice.policy} />
         </>
       )}
     </LiveKitRoom>
   );
 }
 
-function GameVoiceControls({ channelId, settings, policy, onLeave }: { channelId: string; settings: Settings; policy: VoicePolicy; onLeave: () => void }) {
+function GameVoiceControls({ channelId, settings, policy }: { channelId: string; settings: Settings; policy: VoicePolicy }) {
   const { localParticipant } = useLocalParticipant();
   const [pttActive, setPttActive] = useState(false);
   const pttKey = settings.pushToTalkKey || 'Space';

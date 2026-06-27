@@ -119,7 +119,10 @@ export const UserSettingsSchema = z.object({
 });
 
 export const FriendRequestSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
+  targetUserId: z.string().cuid().optional(),
+}).refine((input) => input.email || input.targetUserId, {
+  message: 'E-posta veya kullanıcı seçilmelidir.',
 });
 
 export const FriendRequestResponseSchema = z.object({

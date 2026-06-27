@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Bell, Code2, Gamepad2, Hash, LogOut, Mic, MicOff, Plus, Settings, Shield, UserPlus, Video, Home } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Bell, Code2, Gamepad2, Hash, LogOut, MessageCircle, Mic, MicOff, PhoneOff, Plus, Settings, Shield, UserPlus, Video, Home } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import { api, clearToken, getToken } from '@/lib/api';
+import { API_URL, api, clearToken, getToken } from '@/lib/api';
 import { ChatPanel } from './ChatPanel';
 import { VoiceRoom } from './VoiceRoom';
 import { FriendsPanel } from './FriendsPanel';
@@ -28,8 +28,36 @@ type ServerDetail = {
 };
 
 export type VoiceState = { userId: string; name: string; channelId: string; serverId: string; muted: boolean; deafened: boolean; camera: boolean; screenShare: boolean };
+type DraggingVoiceUser = { id: string; name: string; x: number; y: number };
 
-type Panel = 'chat' | 'friends' | 'settings' | 'admin' | 'notifications' | 'integrations';
+type Panel = 'chat' | 'messages' | 'friends' | 'settings' | 'admin' | 'notifications' | 'integrations';
+type MenuPosition = { x: number; y: number };
+
+const menuSurfaceStyle = {
+  position: 'fixed' as const,
+  backgroundColor: '#2f3136',
+  border: '1px solid #202225',
+  padding: '4px',
+  borderRadius: '4px',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '2px',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+  maxHeight: 'calc(100vh - 16px)',
+  overflowY: 'auto' as const,
+};
+
+function clampMenuPosition(x: number, y: number, width = 240, height = 320): MenuPosition {
+  if (typeof window === 'undefined') return { x, y };
+  const margin = 8;
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    x: Math.min(Math.max(x, margin), maxX),
+    y: Math.min(Math.max(y, margin), maxY),
+  };
+}
 
 function groupMembers(members: Member[]) {
   const groups: { [key: string]: Member[] } = { OWNER: [], ADMIN: [], MODERATOR: [], ONLINE: [], OFFLINE: [] };
@@ -50,6 +78,41 @@ function presenceColor(status?: string) {
   return '#9ca3af';
 }
 
+function canMoveVoiceUser(actorRole: string, targetRole?: string, isSelf = false) {
+  if (isSelf) return true;
+  if (!targetRole) return false;
+  if (actorRole === 'OWNER') return true;
+  if (actorRole === 'ADMIN') return targetRole !== 'OWNER';
+  return false;
+}
+
+type VoiceUserItemProps = {
+  vu: VoiceState;
+  isLocalMuted: boolean;
+  setVoiceUserMenu: React.Dispatch<React.SetStateAction<{ x: number; y: number; voiceUser: VoiceState } | null>>;
+  canDrag: boolean;
+  onCustomDragStart: (id: string, name: string, x: number, y: number) => void;
+};
+
+const VoiceUserItem = React.memo(function VoiceUserItem({ vu, isLocalMuted, setVoiceUserMenu, canDrag, onCustomDragStart }: VoiceUserItemProps) {
+  return (
+    <div className={`voice-user-item ${canDrag ? 'draggable' : 'not-draggable'}`}
+         style={{ touchAction: 'none' }}
+         onPointerDown={(e) => {
+           if (!canDrag || e.button !== 0) return;
+           e.stopPropagation();
+           e.preventDefault();
+           onCustomDragStart(vu.userId, vu.name, e.clientX, e.clientY);
+         }}
+         onContextMenu={e => { e.preventDefault(); setVoiceUserMenu({ ...clampMenuPosition(e.clientX, e.clientY, 240, 420), voiceUser: vu }); }}>
+      <div className="avatar" style={{ width: 20, height: 20, fontSize: 10 }}>{vu.name.slice(0, 1).toUpperCase()}</div>
+      <span style={{ maxWidth: '120px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{vu.name}</span>
+      {vu.muted && <MicOff size={14} color="#f87171" />}
+      {isLocalMuted && <span style={{ fontSize: '10px', backgroundColor: '#374151', padding: '2px 4px', borderRadius: '4px' }}>Sesi kısık</span>}
+    </div>
+  );
+});
+
 export function AppShell() {
   const [token, setToken] = useState<string | null>(null);
   const [servers, setServers] = useState<Server[]>([]);
@@ -62,16 +125,62 @@ export function AppShell() {
   const [memberMenu, setMemberMenu] = useState<{ x: number; y: number; member: Member } | null>(null);
   const [voiceUserMenu, setVoiceUserMenu] = useState<{ x: number; y: number; voiceUser: VoiceState } | null>(null);
   const [draggedChannelId, setDraggedChannelId] = useState<string | null>(null);
+  const [draggingUser, setDraggingUser] = useState<DraggingVoiceUser | null>(null);
+  const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
   const [voiceStates, setVoiceStates] = useState<VoiceState[]>([]);
   const [globalSocket, setGlobalSocket] = useState<Socket | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email?: string; presenceStatus?: string } | null>(null);
+  const [directUser, setDirectUser] = useState<{ id: string; name: string; email?: string; presenceStatus?: string } | null>(null);
   const textChannels = useMemo(() => activeServer?.server.channels.filter((c) => c.type === 'TEXT') ?? [], [activeServer]);
   const voiceChannels = useMemo(() => activeServer?.server.channels.filter((c) => c.type === 'VOICE' && c.name.toLowerCase() !== 'afk') ?? [], [activeServer]);
   const afkChannel = useMemo(() => activeServer?.server.channels.find((c) => c.type === 'VOICE' && c.name.toLowerCase() === 'afk'), [activeServer]);
+  const myVoiceState = useMemo(() => {
+    if (!currentUser || !activeServer) return null;
+    return voiceStates.find((state) => state.userId === currentUser.id && state.serverId === activeServer.server.id) ?? null;
+  }, [voiceStates, currentUser?.id, activeServer?.server.id]);
+  const myVoiceChannel = useMemo(() => {
+    if (!myVoiceState || !activeServer) return null;
+    return activeServer.server.channels.find((channel) => channel.id === myVoiceState.channelId) ?? null;
+  }, [myVoiceState?.channelId, activeServer]);
   const canManage = activeServer?.server.members.some(m => m.user.id === currentUser?.id && ['OWNER', 'ADMIN', 'MODERATOR'].includes(m.role));
   const currentMember = activeServer?.server.members.find(m => m.user.id === currentUser?.id);
   const currentUserRole = currentMember?.role || 'MEMBER';
   const roleRank: Record<string, number> = { OWNER: 50, ADMIN: 40, MODERATOR: 30, MEMBER: 20, GUEST: 10 };
+  const draggingUserRef = React.useRef<DraggingVoiceUser | null>(null);
+  const moveVoiceUserRef = React.useRef<(targetChannelId: string, targetUserId: string) => void>(() => undefined);
+  draggingUserRef.current = draggingUser;
+
+  React.useEffect(() => {
+    if (!draggingUser) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      setDraggingUser(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const channelEl = el?.closest('[data-channel-id]');
+      setHoveredChannelId(channelEl ? channelEl.getAttribute('data-channel-id') : null);
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const channelEl = el?.closest('[data-channel-id]');
+      if (channelEl) {
+        const targetChannelId = channelEl.getAttribute('data-channel-id');
+        if (targetChannelId && draggingUserRef.current) {
+          moveVoiceUserRef.current(targetChannelId, draggingUserRef.current.id);
+        }
+      }
+      setDraggingUser(null);
+      setHoveredChannelId(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [!!draggingUser]);
 
   useEffect(() => {
     if (activeServer && globalSocket) {
@@ -81,8 +190,20 @@ export function AppShell() {
 
   useEffect(() => {
     const handleNavFriends = () => { setActiveServer(null); setPanel('friends'); };
+    const handleNavDirect = (event: any) => {
+      const user = event.detail?.user;
+      if (user?.id) {
+        setDirectUser(user);
+        setActiveServer(null);
+        setPanel('messages');
+      }
+    };
     window.addEventListener('nav:friends', handleNavFriends);
-    return () => window.removeEventListener('nav:friends', handleNavFriends);
+    window.addEventListener('nav:direct', handleNavDirect);
+    return () => {
+      window.removeEventListener('nav:friends', handleNavFriends);
+      window.removeEventListener('nav:direct', handleNavDirect);
+    };
   }, []);
 
   useEffect(() => {
@@ -98,13 +219,13 @@ export function AppShell() {
       return;
     }
     setToken(t);
-    api<{ user: { id: string; name: string } }>('/auth/me', { token: t }).then(data => setCurrentUser(data.user));
+    api<{ user: { id: string; name: string; email?: string; presenceStatus?: string } }>('/auth/me', { token: t }).then(data => setCurrentUser(data.user));
     api<{ servers: Server[] }>('/servers', { token: t }).then((data) => {
       setServers(data.servers);
-      if (!activeServer) setPanel('friends');
+      if (!activeServer) setPanel('messages');
     });
 
-    const s = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', { auth: { token: t } });
+    const s = io(API_URL, { auth: { token: t } });
     setGlobalSocket(s);
 
     s.on('presence:update', (data: { userId: string; status: string }) => {
@@ -180,17 +301,17 @@ export function AppShell() {
   }, [activeServer]);
 
   useEffect(() => {
-    if (!currentUser || !activeServer || !afkChannel || !globalSocket) return;
+    if (!currentUser || !activeServer || !afkChannel) return;
     const myState = voiceStates.find(s => s.userId === currentUser.id && s.serverId === activeServer.server.id);
     if (!myState || myState.channelId === afkChannel.id) return;
     
     if (myState.muted) {
       const timer = setTimeout(() => {
-         globalSocket.emit('voice:force_move', { targetUserId: currentUser.id, targetChannelId: afkChannel.id });
+        window.dispatchEvent(new CustomEvent('letsmeet:force-move', { detail: { channelId: afkChannel.id } }));
       }, 15 * 60 * 1000);
       return () => clearTimeout(timer);
     }
-  }, [voiceStates, currentUser, activeServer, afkChannel, globalSocket]);
+  }, [voiceStates, currentUser, activeServer, afkChannel]);
 
   async function refreshActiveServer() {
     if (!token || !activeServer) return;
@@ -236,6 +357,24 @@ export function AppShell() {
       alert('Arkadaşlık isteği gönderildi.');
     } catch (e: any) {
       alert(e.message || 'İstek gönderilemedi.');
+    }
+  }
+
+  function openDirectMessage(user: { id: string; name: string; email?: string; presenceStatus?: string }) {
+    setDirectUser(user);
+    setActiveServer(null);
+    setPanel('messages');
+    setMemberMenu(null);
+    setVoiceUserMenu(null);
+  }
+
+  function leaveCurrentVoiceChannel() {
+    if (!myVoiceState || !currentUser) return;
+    window.dispatchEvent(new CustomEvent('letsmeet:voice-leave', { detail: { channelId: myVoiceState.channelId } }));
+    setVoiceStates((prev) => prev.filter((state) => state.userId !== currentUser.id));
+    if (activeChannel?.id === myVoiceState.channelId) {
+      setActiveChannel(null);
+      setPanel('chat');
     }
   }
 
@@ -322,8 +461,32 @@ export function AppShell() {
     refreshActiveServer();
   }
 
+  function canMoveVoiceUserInActiveServer(targetUserId: string) {
+    const isSelf = targetUserId === currentUser?.id;
+    const targetRole = activeServer?.server.members.find(m => m.user.id === targetUserId)?.role;
+    return canMoveVoiceUser(currentUserRole, targetRole, isSelf);
+  }
+
+  function handleUserDrop(targetChannelId: string, targetUserId: string) {
+    if (!token || !targetUserId || !activeServer) return;
+    if (!canMoveVoiceUserInActiveServer(targetUserId)) return;
+    if (voiceStates.find(vs => vs.userId === targetUserId)?.channelId === targetChannelId) return;
+
+    if (targetUserId === currentUser?.id) {
+      const targetChannel = activeServer.server.channels.find(c => c.id === targetChannelId);
+      if (targetChannel) {
+        setActiveChannel(targetChannel);
+        setPanel('chat');
+      }
+      window.dispatchEvent(new CustomEvent('letsmeet:voice-join', { detail: { channelId: targetChannelId } }));
+    } else {
+      globalSocket?.emit('voice:force_move', { targetUserId, targetChannelId });
+    }
+  }
+  moveVoiceUserRef.current = handleUserDrop;
+
   const renderMember = (m: Member) => (
-    <div key={m.user.id} className="member-row" onContextMenu={(e) => { e.preventDefault(); setMemberMenu({ x: e.clientX, y: e.clientY, member: m }); }}>
+    <div key={m.user.id} className="member-row" onContextMenu={(e) => { e.preventDefault(); setMemberMenu({ ...clampMenuPosition(e.clientX, e.clientY, 240, 320), member: m }); }}>
       <div className="avatar" style={{ position: 'relative' }}>
         {m.user.name.slice(0, 1).toUpperCase()}
         <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: '50%', backgroundColor: presenceColor(m.user.presenceStatus), border: '2px solid #2f3136', zIndex: 10 }} />
@@ -340,7 +503,7 @@ export function AppShell() {
   return (
     <div className={`app ${compactMode ? 'compact-mode' : ''} ${cinematicMode ? 'cinematic-mode' : ''}`}>
       <aside className="serverbar">
-        <button className={`server-pill ${activeServer === null ? 'active' : ''}`} onClick={() => { setActiveServer(null); setPanel('friends'); }} title="Ana Sayfa" style={{ flexShrink: 0 }}>
+        <button className={`server-pill ${activeServer === null ? 'active' : ''}`} onClick={() => { setActiveServer(null); setPanel('messages'); }} title="Ana Sayfa" style={{ flexShrink: 0 }}>
           <Home size={22} />
         </button>
         <div style={{ width: '32px', height: '2px', backgroundColor: '#3f4147', margin: '0 auto 8px', borderRadius: '1px', flexShrink: 0 }} />
@@ -374,14 +537,18 @@ export function AppShell() {
               {textChannels.map((channel) => (
                 <button key={channel.id} 
                   draggable={!!canManage}
-                  onDragStart={() => setDraggedChannelId(channel.id)}
+                  onDragStart={(e) => { setDraggedChannelId(channel.id); e.dataTransfer.setData('text/plain', channel.id); }}
                   onDragOver={(e) => { e.preventDefault(); if (draggedChannelId && draggedChannelId !== channel.id) e.currentTarget.style.borderTop = '4px solid #4ade80'; }}
                   onDragLeave={(e) => { e.currentTarget.style.borderTop = ''; }}
-                  onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderTop = ''; handleDrop(channel); }}
+                  onDrop={(e) => { 
+                    e.preventDefault(); 
+                    e.currentTarget.style.borderTop = ''; 
+                    if (draggedChannelId) handleDrop(channel); 
+                  }}
                   onDragEnd={() => setDraggedChannelId(null)}
                   className={`channel ${activeChannel?.id === channel.id && panel === 'chat' ? 'active' : ''} ${draggedChannelId === channel.id ? 'dragging' : ''}`} 
                   onClick={() => { setActiveChannel(channel); setPanel('chat'); }} 
-                  onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ x: e.clientX, y: e.clientY, channel }); }}>
+                  onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ ...clampMenuPosition(e.clientX, e.clientY, 200, 120), channel }); }}>
                   <Hash size={16} /> {channel.name}
                 </button>
               ))}
@@ -392,17 +559,47 @@ export function AppShell() {
               {voiceChannels.map((channel) => {
                 const channelUsers = voiceStates.filter(vs => vs.channelId === channel.id);
                 return (
-                <div key={channel.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div 
+                  key={channel.id} 
+                  data-channel-id={channel.id}
+                  style={{ 
+                    display: 'flex', flexDirection: 'column',
+                    ...(hoveredChannelId === channel.id ? { borderTop: '4px solid #4ade80', backgroundColor: 'rgba(74, 222, 128, 0.2)' } : {})
+                  }}
+                  onDragOver={(e) => { 
+                    e.preventDefault(); 
+                    if (draggedChannelId && draggedChannelId !== channel.id) {
+                      e.currentTarget.style.borderTop = '4px solid #4ade80'; 
+                    } else if (!draggedChannelId && !draggingUser) {
+                      e.currentTarget.style.backgroundColor = 'rgba(74, 222, 128, 0.2)';
+                    }
+                  }}
+                  onDragLeave={(e) => { 
+                    e.currentTarget.style.borderTop = ''; 
+                    e.currentTarget.style.backgroundColor = ''; 
+                  }}
+                  onDrop={(e) => { 
+                    e.preventDefault(); 
+                    e.currentTarget.style.borderTop = ''; 
+                    e.currentTarget.style.backgroundColor = ''; 
+                    const targetUserId = e.dataTransfer.getData('text/plain');
+                    if (draggedChannelId) {
+                      handleDrop(channel); 
+                    } else if (targetUserId) {
+                      handleUserDrop(channel.id, targetUserId);
+                    }
+                  }}
+                >
                   <button 
                     draggable={!!canManage}
-                    onDragStart={() => setDraggedChannelId(channel.id)}
-                    onDragOver={(e) => { e.preventDefault(); if (draggedChannelId && draggedChannelId !== channel.id) e.currentTarget.style.borderTop = '4px solid #4ade80'; }}
-                    onDragLeave={(e) => { e.currentTarget.style.borderTop = ''; }}
-                    onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderTop = ''; handleDrop(channel); }}
+                    onDragStart={(e) => { 
+                      e.dataTransfer.setData('text/plain', channel.id); 
+                      setTimeout(() => setDraggedChannelId(channel.id), 0);
+                    }}
                     onDragEnd={() => setDraggedChannelId(null)}
                     className={`channel ${activeChannel?.id === channel.id && panel === 'chat' ? 'active' : ''} ${draggedChannelId === channel.id ? 'dragging' : ''}`} 
                     onClick={() => { setActiveChannel(channel); setPanel('chat'); }} 
-                    onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ x: e.clientX, y: e.clientY, channel }); }}>
+                    onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ ...clampMenuPosition(e.clientX, e.clientY, 200, 120), channel }); }}>
                     <Mic size={16} /> {channel.name}
                     {channel.requirePushToTalk && <span className="channel-badge">PTT</span>}
                   </button>
@@ -410,16 +607,18 @@ export function AppShell() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0', marginBottom: '8px' }}>
                       {channelUsers.map(vu => {
                         const isLocalMuted = (JSON.parse(localStorage.getItem('letsmeet:local-muted') || '[]')).includes(vu.userId);
+                        const canDrag = canMoveVoiceUserInActiveServer(vu.userId);
                         return (
-                          <div key={vu.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: 'var(--muted)' }}
-                               onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                               onContextMenu={e => { e.preventDefault(); setVoiceUserMenu({ x: e.clientX, y: e.clientY, voiceUser: vu }); }}>
-                            <div className="avatar" style={{ width: 20, height: 20, fontSize: 10 }}>{vu.name.slice(0, 1).toUpperCase()}</div>
-                            <span style={{ maxWidth: '120px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{vu.name}</span>
-                            {vu.muted && <MicOff size={14} color="#f87171" />}
-                            {isLocalMuted && <span style={{ fontSize: '10px', backgroundColor: '#374151', padding: '2px 4px', borderRadius: '4px' }}>Sesi kısık</span>}
-                          </div>
+                          <VoiceUserItem 
+                            key={vu.userId} 
+                            vu={vu} 
+                            isLocalMuted={isLocalMuted} 
+                            setVoiceUserMenu={setVoiceUserMenu} 
+                            canDrag={canDrag}
+                            onCustomDragStart={(id: string, name: string, x: number, y: number) => {
+                              setDraggingUser({ id, name, x, y });
+                            }}
+                          />
                         );
                       })}
                     </div>
@@ -431,12 +630,40 @@ export function AppShell() {
             {afkChannel && (
               <div style={{ borderTop: '1px solid #ffffff10', paddingTop: '12px', paddingBottom: '12px', marginTop: 'auto' }}>
                 <div className="section-title" style={{ textAlign: 'center' }}>AFK Kanalı</div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div 
+                  data-channel-id={afkChannel.id}
+                  style={{ 
+                    display: 'flex', flexDirection: 'column',
+                    ...(hoveredChannelId === afkChannel.id ? { borderTop: '4px solid #4ade80', backgroundColor: 'rgba(74, 222, 128, 0.2)' } : {})
+                  }}
+                  onDragOver={(e) => { 
+                    e.preventDefault(); 
+                    if (draggedChannelId && draggedChannelId !== afkChannel.id) {
+                      e.currentTarget.style.borderTop = '4px solid #4ade80';
+                    } else if (!draggedChannelId && !draggingUser) {
+                      e.currentTarget.style.backgroundColor = 'rgba(74, 222, 128, 0.2)';
+                    }
+                  }}
+                  onDragLeave={(e) => { 
+                    e.currentTarget.style.backgroundColor = ''; 
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderTop = 'none';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    const targetUserId = e.dataTransfer.getData('text/plain');
+                    if (draggedChannelId && draggedChannelId !== afkChannel.id) {
+                      handleDrop(afkChannel);
+                    } else if (targetUserId) {
+                      handleUserDrop(afkChannel.id, targetUserId);
+                    }
+                  }}
+                >
                   <button 
                     className={`channel ${activeChannel?.id === afkChannel.id && panel === 'chat' ? 'active' : ''}`} 
                     style={{ justifyContent: 'center' }}
                     onClick={() => { setActiveChannel(afkChannel); setPanel('chat'); }} 
-                    onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ x: e.clientX, y: e.clientY, channel: afkChannel }); }}>
+                    onContextMenu={(e) => { if (!canManage) return; e.preventDefault(); setChannelMenu({ ...clampMenuPosition(e.clientX, e.clientY, 200, 120), channel: afkChannel }); }}>
                     <Mic size={16} color="#9ca3af" /> <span style={{ color: '#9ca3af' }}>{afkChannel.name}</span>
                   </button>
                   {(() => {
@@ -444,14 +671,21 @@ export function AppShell() {
                     if (channelUsers.length === 0) return null;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0', marginBottom: '8px' }}>
-                        {channelUsers.map(vu => (
-                          <div key={vu.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: 'var(--muted)' }}
-                               onContextMenu={e => { e.preventDefault(); setVoiceUserMenu({ x: e.clientX, y: e.clientY, voiceUser: vu }); }}>
-                            <div className="avatar" style={{ width: 20, height: 20, fontSize: 10, opacity: 0.5 }}>{vu.name.slice(0, 1).toUpperCase()}</div>
-                            <span style={{ maxWidth: '120px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', opacity: 0.5 }}>{vu.name}</span>
-                            <MicOff size={14} color="#f87171" opacity={0.5} />
-                          </div>
-                        ))}
+                        {channelUsers.map(vu => {
+                          const canDrag = canMoveVoiceUserInActiveServer(vu.userId);
+                          return (
+                            <VoiceUserItem 
+                              key={vu.userId} 
+                              vu={vu} 
+                              isLocalMuted={false} 
+                              setVoiceUserMenu={setVoiceUserMenu} 
+                              canDrag={canDrag}
+                              onCustomDragStart={(id: string, name: string, x: number, y: number) => {
+                                setDraggingUser({ id, name, x, y });
+                              }}
+                            />
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -459,6 +693,16 @@ export function AppShell() {
               </div>
             )}
             
+            {myVoiceState && myVoiceChannel && (
+              <div className="voice-connection-card">
+                <span>Bağlı</span>
+                <strong>{myVoiceChannel.name}</strong>
+                <button className="voice-leave-button" onClick={leaveCurrentVoiceChannel}>
+                  <PhoneOff size={14} /> Kanaldan ayrıl
+                </button>
+              </div>
+            )}
+
             {canManage && (
               <div style={{ padding: '12px 14px', backgroundColor: 'rgba(0,0,0,0.2)', borderTop: '1px solid var(--line)', flexShrink: 0 }}>
                 <button className={`channel ${panel === 'admin' ? 'active' : ''}`} onClick={() => setPanel('admin')}><Settings size={16} /> Sunucu Yönetimi</button>
@@ -469,6 +713,7 @@ export function AppShell() {
           <>
             <div className="channel-header"><span>Ana Sayfa</span></div>
             <div className="channel-section">
+              <button className={`channel ${panel === 'messages' ? 'active' : ''}`} onClick={() => setPanel('messages')}><MessageCircle size={16} /> Mesajlar</button>
               <button className={`channel ${panel === 'friends' ? 'active' : ''}`} onClick={() => setPanel('friends')}><UserPlus size={16} /> Arkadaşlar</button>
               <button className={`channel ${panel === 'notifications' ? 'active' : ''}`} onClick={() => setPanel('notifications')}><Bell size={16} /> Bildirimler</button>
               <button className={`channel ${panel === 'settings' ? 'active' : ''}`} onClick={() => setPanel('settings')}><Settings size={16} /> Uygulama ayarları</button>
@@ -490,13 +735,14 @@ export function AppShell() {
                 <VoiceRoom token={token} channel={activeChannel} />
               </div>
               {activeChannel.name.toLowerCase() !== 'afk' && (
-                <div style={{ width: '280px', flexShrink: 0, borderLeft: '1px solid #3f4147', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ width: '320px', minWidth: 0, maxWidth: '38%', flexShrink: 0, overflow: 'hidden', borderLeft: '1px solid #3f4147', display: 'flex', flexDirection: 'column' }}>
                   <ChatPanel token={token} channel={activeChannel} />
                 </div>
               )}
             </div>
           )}
-          {panel === 'friends' && <FriendsPanel token={token} />}
+          {panel === 'messages' && <FriendsPanel token={token} initialTab="messages" initialUser={directUser} onInitialUserConsumed={() => setDirectUser(null)} />}
+          {panel === 'friends' && <FriendsPanel token={token} initialTab="friends" initialUser={directUser} onInitialUserConsumed={() => setDirectUser(null)} />}
           {panel === 'settings' && <SettingsPanel token={token} />}
           {panel === 'notifications' && <NotificationsPanel token={token} />}
           {panel === 'admin' && activeServer && <ServerAdminPanel token={token} server={activeServer.server} role={activeServer.role} onChanged={refreshActiveServer} />}
@@ -522,16 +768,16 @@ export function AppShell() {
       )}
 
       {channelMenu && (
-        <div style={{ position: 'fixed', top: channelMenu.y, left: channelMenu.x, backgroundColor: '#2f3136', border: '1px solid #202225', padding: '4px', borderRadius: '4px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+        <div style={{ ...menuSurfaceStyle, top: channelMenu.y, left: channelMenu.x }}>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => editChannel(channelMenu.channel.id, channelMenu.channel.name)}>İsim Değiştir</button>
           <button style={{ backgroundColor: 'transparent', color: '#ed4245', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ed4245'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#ed4245'; }} onClick={() => deleteChannel(channelMenu.channel.id, channelMenu.channel.name)}>Kanalı Sil</button>
         </div>
       )}
 
       {memberMenu && (
-        <div style={{ position: 'fixed', top: memberMenu.y, left: memberMenu.x, backgroundColor: '#2f3136', border: '1px solid #202225', padding: '4px', borderRadius: '4px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+        <div style={{ ...menuSurfaceStyle, top: memberMenu.y, left: memberMenu.x }}>
           <div style={{ padding: '4px 8px', fontSize: '12px', color: '#9ca3af', fontWeight: 'bold' }}>{memberMenu.member.user.name}</div>
-          <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => { setActiveServer(null); setPanel('friends'); setMemberMenu(null); }}>Özel Mesaj Gönder</button>
+          <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => openDirectMessage(memberMenu.member.user)}>Özel Mesaj Gönder</button>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => { handleAddFriend(memberMenu.member.user.id); setMemberMenu(null); }}>Arkadaş Ekle</button>
           {canManage && memberMenu.member.role !== 'OWNER' && roleRank[memberMenu.member.role] <= roleRank[currentUserRole] && (
             <>
@@ -549,9 +795,9 @@ export function AppShell() {
       )}
 
       {voiceUserMenu && (
-        <div style={{ position: 'fixed', top: voiceUserMenu.y, left: voiceUserMenu.x, backgroundColor: '#2f3136', border: '1px solid #202225', padding: '4px', borderRadius: '4px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+        <div style={{ ...menuSurfaceStyle, top: voiceUserMenu.y, left: voiceUserMenu.x }}>
           <div style={{ padding: '4px 8px', fontSize: '12px', color: '#9ca3af', fontWeight: 'bold' }}>{voiceUserMenu.voiceUser.name}</div>
-          <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => { setActiveServer(null); setPanel('friends'); }}>Özel Mesaj Gönder</button>
+          <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => openDirectMessage({ id: voiceUserMenu.voiceUser.userId, name: voiceUserMenu.voiceUser.name })}>Özel Mesaj Gönder</button>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => handleAddFriend(voiceUserMenu.voiceUser.userId)}>Arkadaş Ekle</button>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => handleLocalMute(voiceUserMenu.voiceUser.userId)}>
             { (JSON.parse(localStorage.getItem('letsmeet:local-muted') || '[]')).includes(voiceUserMenu.voiceUser.userId) ? 'Yerel Sesi Aç' : 'Yerel Sesi Kapat' }
@@ -561,12 +807,12 @@ export function AppShell() {
               Mikrofonunu Kapat (Admin)
             </button>
           )}
-          {canManage && (
+          {canMoveVoiceUserInActiveServer(voiceUserMenu.voiceUser.userId) && (
             <>
               <div style={{ padding: '4px 8px', fontSize: '12px', color: '#9ca3af', fontWeight: 'bold' }}>Kanal Değiştir</div>
               {activeServer?.server.channels.filter(c => c.type === 'VOICE' && c.id !== voiceUserMenu.voiceUser.channelId).map(c => (
                 <button key={`move-${c.id}`} style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => {
-                  globalSocket?.emit('voice:force_move', { targetUserId: voiceUserMenu.voiceUser.userId, targetChannelId: c.id });
+                  handleUserDrop(c.id, voiceUserMenu.voiceUser.userId);
                   setVoiceUserMenu(null);
                 }}>
                   {c.name}'e Taşı
@@ -576,11 +822,34 @@ export function AppShell() {
           )}
         </div>
       )}
+      
+      {draggingUser && (
+        <div style={{
+          position: 'fixed',
+          left: draggingUser.x + 10,
+          top: draggingUser.y + 10,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          background: '#1f2937',
+          color: 'white',
+          padding: '6px 12px',
+          borderRadius: '4px',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          border: '1px solid #4ade80',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          {draggingUser.name}
+        </div>
+      )}
     </div>
   );
 }
 
 function panelTitle(panel: Panel) {
+  if (panel === 'messages') return 'Mesajlar';
   if (panel === 'friends') return 'Arkadaşlar ve özel mesajlar';
   if (panel === 'settings') return 'Oyun / ses ayarları';
   if (panel === 'notifications') return 'Bildirimler';

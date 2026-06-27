@@ -102,14 +102,17 @@ export function attachSocket(server: HttpServer) {
       const channel = await prisma.channel.findUnique({ where: { id: channelId } });
       if (!channel) return;
       
-      if (voiceStates.has(channel.serverId)) {
-        voiceStates.get(channel.serverId)!.delete(user.id);
-      }
+      const serverVoiceStates = voiceStates.get(channel.serverId);
+      const currentState = serverVoiceStates?.get(user.id);
+      if (!currentState || currentState.channelId !== channelId) return;
+      serverVoiceStates?.delete(user.id);
       
       io.to(`server:${channel.serverId}`).emit('voice:remove', { userId: user.id, channelId });
       
-      socket.data.currentVoiceChannelId = null;
-      socket.data.currentVoiceServerId = null;
+      if (socket.data.currentVoiceChannelId === channelId) {
+        socket.data.currentVoiceChannelId = null;
+        socket.data.currentVoiceServerId = null;
+      }
     });
 
     socket.on('voice:state', async ({ channelId, muted, deafened, camera, screenShare }) => {
@@ -139,10 +142,20 @@ export function attachSocket(server: HttpServer) {
     });
 
     socket.on('voice:force_move', async ({ targetUserId, targetChannelId }) => {
+      if (typeof targetUserId !== 'string' || typeof targetChannelId !== 'string') return;
       const channel = await prisma.channel.findUnique({ where: { id: targetChannelId } });
-      if (!channel) return;
+      if (!channel || channel.type !== 'VOICE') return;
       const member = await activeMember(user.id, channel.serverId);
-      if (!member || !['OWNER', 'ADMIN', 'MODERATOR'].includes(member.role)) return;
+      if (!member) return;
+      
+      const targetMember = await activeMember(targetUserId, channel.serverId);
+      if (!targetMember) return;
+
+      const actorIsOwner = member.role === 'OWNER';
+      const actorIsAdmin = member.role === 'ADMIN';
+      if (!actorIsOwner && !actorIsAdmin) return;
+      if (actorIsAdmin && targetMember.role === 'OWNER') return;
+      if (!voiceStates.get(channel.serverId)?.has(targetUserId)) return;
       
       io.to(`user:${targetUserId}`).emit('voice:force_move', { channelId: targetChannelId });
     });
@@ -173,16 +186,9 @@ export function attachSocket(server: HttpServer) {
     socket.on('direct:create', async (payload, ack) => {
       try {
         const input = CreateDirectMessageSchema.parse(payload);
-        const accepted = await prisma.friendRequest.findFirst({
-          where: {
-            status: 'ACCEPTED',
-            OR: [
-              { senderId: user.id, receiverId: input.receiverId },
-              { senderId: input.receiverId, receiverId: user.id },
-            ],
-          },
-        });
-        if (!accepted) throw new Error('Friendship required');
+        const receiver = await prisma.user.findUnique({ where: { id: input.receiverId } });
+        if (!receiver) throw new Error('Kullanıcı bulunamadı.');
+        if (receiver.id === user.id) throw new Error('Kendine özel mesaj gönderemezsin.');
         const message = await prisma.directMessage.create({ data: { senderId: user.id, receiverId: input.receiverId, content: input.content }, include: { sender: true, receiver: true } });
         io.to(`user:${input.receiverId}`).emit('direct:new', { message });
         socket.emit('direct:new', { message });

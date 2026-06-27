@@ -126,19 +126,6 @@ async function canUseChannel(userId: string, channelId: string, capability: 'vie
   return { channel, member, allowed };
 }
 
-async function areFriends(userA: string, userB: string) {
-  const accepted = await prisma.friendRequest.findFirst({
-    where: {
-      status: 'ACCEPTED',
-      OR: [
-        { senderId: userA, receiverId: userB },
-        { senderId: userB, receiverId: userA },
-      ],
-    },
-  });
-  return Boolean(accepted);
-}
-
 router.get('/health', (_req, res) => {
   res.json({ ok: true, name: "Let's Meet API", version: '0.4.0', time: new Date().toISOString() });
 });
@@ -670,7 +657,9 @@ router.get('/friends', requireAuth, async (req, res) => {
 router.post('/friends/request', requireAuth, async (req, res) => {
   try {
     const input = FriendRequestSchema.parse(req.body);
-    const receiver = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
+    const receiver = input.targetUserId
+      ? await prisma.user.findUnique({ where: { id: input.targetUserId } })
+      : await prisma.user.findUnique({ where: { email: input.email!.toLowerCase() } });
     if (!receiver) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
     if (receiver.id === req.user!.id) return res.status(400).json({ message: 'Kendine arkadaşlık isteği gönderemezsin.' });
     const request = await prisma.friendRequest.upsert({
@@ -683,6 +672,35 @@ router.post('/friends/request', requireAuth, async (req, res) => {
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Arkadaşlık isteği gönderilemedi.' });
   }
+});
+
+router.get('/direct/conversations', requireAuth, async (req, res) => {
+  const recentMessages = await prisma.directMessage.findMany({
+    where: {
+      OR: [{ senderId: req.user!.id }, { receiverId: req.user!.id }],
+      deletedAt: null,
+    },
+    include: { sender: true, receiver: true },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+
+  const byUserId = new Map<string, { user: ReturnType<typeof publicUser>; lastMessage: any }>();
+  for (const message of recentMessages) {
+    const otherUser = message.senderId === req.user!.id ? message.receiver : message.sender;
+    if (!byUserId.has(otherUser.id)) {
+      byUserId.set(otherUser.id, { user: publicUser(otherUser), lastMessage: message });
+    }
+  }
+
+  const conversations = Array.from(byUserId.values());
+  conversations.sort((a, b) => {
+    const aTime = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+    const bTime = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  res.json({ conversations });
 });
 
 router.patch('/friends/requests/:requestId', requireAuth, async (req, res) => {
@@ -699,12 +717,14 @@ router.patch('/friends/requests/:requestId', requireAuth, async (req, res) => {
 });
 
 router.get('/direct/:userId/messages', requireAuth, async (req, res) => {
-  if (!(await areFriends(req.user!.id, (req.params.userId as string)))) return res.status(403).json({ message: 'Özel mesaj için arkadaş olmanız gerekir.' });
+  const targetUserId = req.params.userId as string;
+  const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
   const messages = await prisma.directMessage.findMany({
     where: {
       OR: [
-        { senderId: req.user!.id, receiverId: (req.params.userId as string) },
-        { senderId: (req.params.userId as string), receiverId: req.user!.id },
+        { senderId: req.user!.id, receiverId: targetUserId },
+        { senderId: targetUserId, receiverId: req.user!.id },
       ],
       deletedAt: null,
     },
@@ -717,8 +737,11 @@ router.get('/direct/:userId/messages', requireAuth, async (req, res) => {
 
 router.post('/direct/:userId/messages', requireAuth, async (req, res) => {
   try {
-    if (!(await areFriends(req.user!.id, (req.params.userId as string)))) return res.status(403).json({ message: 'Özel mesaj için arkadaş olmanız gerekir.' });
-    const input = CreateDirectMessageSchema.parse({ ...req.body, receiverId: (req.params.userId as string) });
+    const targetUserId = req.params.userId as string;
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+    if (targetUserId === req.user!.id) return res.status(400).json({ message: 'Kendine özel mesaj gönderemezsin.' });
+    const input = CreateDirectMessageSchema.parse({ ...req.body, receiverId: targetUserId });
     const message = await prisma.directMessage.create({ data: { senderId: req.user!.id, receiverId: input.receiverId, content: input.content }, include: { sender: true, receiver: true } });
     res.status(201).json({ message });
   } catch (error: any) {
