@@ -214,8 +214,8 @@ button {
 
 .voice-layout:fullscreen .voice-chat-pane {
   display: flex;
-  width: clamp(300px, 24vw, 360px);
-  max-width: 34vw;
+  width: clamp(280px, 18vw, 320px);
+  max-width: 28vw;
 }
 
 .voice-room-pane {
@@ -455,8 +455,8 @@ button {
 }
 
 .fullscreen-mode .voice-chat-pane {
-  width: clamp(300px, 24vw, 360px);
-  max-width: 34vw;
+  width: clamp(280px, 18vw, 320px);
+  max-width: 28vw;
   display: flex;
 }
 
@@ -499,6 +499,24 @@ button {
 .voice-layout:fullscreen .custom-control-row,
 .fullscreen-mode .custom-control-row {
   flex: 0 0 auto;
+}
+
+.voice-layout:fullscreen .composer,
+.fullscreen-mode .composer {
+  padding: 10px 12px 12px;
+  gap: 8px;
+}
+
+.voice-layout:fullscreen .composer textarea,
+.fullscreen-mode .composer textarea {
+  min-height: 48px;
+  padding: 13px 14px;
+}
+
+.voice-layout:fullscreen .composer button,
+.fullscreen-mode .composer button {
+  min-height: 48px;
+  min-width: 50px;
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {

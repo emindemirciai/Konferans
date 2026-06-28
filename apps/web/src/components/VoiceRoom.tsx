@@ -344,9 +344,13 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
       await video.play().catch(() => null);
       await waitForVideoFrame(video);
 
-      const sourceWidth = video.videoWidth || mediaStreamTrack.getSettings().width || 1280;
-      const sourceHeight = video.videoHeight || mediaStreamTrack.getSettings().height || 720;
-      const scale = Math.min(1, 1280 / sourceWidth, 720 / sourceHeight);
+      const sourceSettings = mediaStreamTrack.getSettings();
+      const sourceWidth = video.videoWidth || sourceSettings.width || 1280;
+      const sourceHeight = video.videoHeight || sourceSettings.height || 720;
+      const viewportScale = window.devicePixelRatio || 1;
+      const maxSnapshotWidth = Math.min(3840, Math.max(1920, Math.round(window.innerWidth * viewportScale)));
+      const maxSnapshotHeight = Math.min(2160, Math.max(1080, Math.round(window.innerHeight * viewportScale)));
+      const scale = Math.min(1, maxSnapshotWidth / sourceWidth, maxSnapshotHeight / sourceHeight);
       const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
       const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
       const context = canvas.getContext('2d');
@@ -354,8 +358,10 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
       context.drawImage(video, 0, 0, targetWidth, targetHeight);
-      setSnapshotUrl(canvas.toDataURL('image/webp', 0.76));
+      setSnapshotUrl(canvas.toDataURL('image/webp', 0.82));
     } catch {
       // Some browsers can reject a frame while the screen track is settling.
     } finally {
