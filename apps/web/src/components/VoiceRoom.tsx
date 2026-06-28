@@ -291,7 +291,7 @@ function LightweightVoiceControls({
       {policy.serverMuted && <span className="pill danger">Sunucuda susturuldun</span>}
 
       {pttEnabled && (
-        <span className={pill ${pttActive ? 'success-bg' : ''}}>
+        <span className={'pill ' + (pttActive ? 'success-bg' : '')}>
           PTT: {pttKey} {pttActive ? 'aktif' : 'bekliyor'}
         </span>
       )}
