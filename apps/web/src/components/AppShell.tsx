@@ -758,12 +758,12 @@ export function AppShell() {
         <div className="content">
           {panel === 'chat' && activeChannel?.type === 'TEXT' && <ChatPanel token={token} channel={activeChannel} />}
           {panel === 'chat' && activeChannel?.type === 'VOICE' && (
-            <div style={{ display: 'flex', flexDirection: 'row', height: '100%', width: '100%' }}>
-              <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+            <div className="voice-layout">
+              <div className="voice-room-pane">
                 <VoiceRoom token={token} channel={activeChannel} />
               </div>
               {activeChannel.name.toLowerCase() !== 'afk' && (
-                <div style={{ width: '380px', minWidth: 0, maxWidth: '44%', flexShrink: 0, overflow: 'hidden', borderLeft: '1px solid #3f4147', display: 'flex', flexDirection: 'column' }}>
+                <div className="voice-chat-pane">
                   <ChatPanel token={token} channel={activeChannel} />
                 </div>
               )}

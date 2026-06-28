@@ -135,7 +135,8 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => null);
+      const target = document.querySelector('.voice-layout') as HTMLElement | null;
+      (target ?? document.documentElement).requestFullscreen().catch(() => null);
     } else {
       document.exitFullscreen().catch(() => null);
     }
