@@ -198,13 +198,6 @@ button {
   background: #07080d;
 }
 
-.voice-layout:fullscreen,
-.fullscreen-mode .voice-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 360px);
-  align-items: stretch;
-}
-
 .cinematic-mode .voice-layout {
   position: fixed;
   inset: 0;
@@ -216,12 +209,13 @@ button {
 .voice-layout:fullscreen .voice,
 .voice-layout:fullscreen .chat {
   height: 100%;
+  min-height: 0;
 }
 
 .voice-layout:fullscreen .voice-chat-pane {
   display: flex;
-  width: auto;
-  max-width: none;
+  width: clamp(300px, 24vw, 360px);
+  max-width: 34vw;
 }
 
 .voice-room-pane {
@@ -461,8 +455,8 @@ button {
 }
 
 .fullscreen-mode .voice-chat-pane {
-  width: auto;
-  max-width: none;
+  width: clamp(300px, 24vw, 360px);
+  max-width: 34vw;
   display: flex;
 }
 
@@ -473,6 +467,16 @@ button {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+.voice-layout:fullscreen .voice-room-pane,
+.fullscreen-mode .voice-room-pane {
+  display: flex;
+}
+
+.voice-layout:fullscreen .voice,
+.fullscreen-mode .voice {
+  flex: 1 1 auto;
 }
 
 .voice-layout:fullscreen .voice-stage,
@@ -486,8 +490,15 @@ button {
 
 .voice-layout:fullscreen .custom-stage,
 .fullscreen-mode .custom-stage {
+  flex: 1 1 0;
+  height: auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.voice-layout:fullscreen .custom-control-row,
+.fullscreen-mode .custom-control-row {
+  flex: 0 0 auto;
 }
 
 .cinematic-mode .voice-chat-pane {
@@ -1470,8 +1481,6 @@ button {
 }
 
 .custom-focus-stage .lk-participant-tile {
-  display: grid !important;
-  place-items: center;
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
@@ -1485,10 +1494,8 @@ button {
 
 .custom-focus-stage .lk-participant-media-video,
 .custom-focus-stage .lk-participant-media-video[data-lk-source="screen_share"] {
-  width: auto !important;
-  height: auto !important;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain !important;
 }
 
@@ -1544,10 +1551,8 @@ button {
 }
 
 .local-screen-preview-media img {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   object-position: center center;
   display: block;
