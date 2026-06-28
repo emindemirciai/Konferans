@@ -1,4 +1,4 @@
-# Lets Meet v4 Production Layer
+# Konferans v4 Production Layer
 
 v4 adds production-focused structure: rate limiting, health checks, backup scripts, CI, reverse proxy examples and deployment hardening.
 
@@ -48,5 +48,5 @@ Backups should be automated from the VPS host using cron or Dokploy scheduled jo
 Example cron:
 
 ```cron
-0 4 * * * cd /path/to/lets-meet && BACKUP_DIR=/srv/lets-meet/backups bash scripts/backup-postgres.sh
+0 4 * * * cd /path/to/konferans && BACKUP_DIR=/srv/konferans/backups bash scripts/backup-postgres.sh
 ```

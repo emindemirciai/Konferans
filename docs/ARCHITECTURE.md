@@ -1,8 +1,8 @@
-# Lets Meet Architecture
+# Konferans Architecture
 
 ## Goal
 
-Lets Meet is designed as a gaming-first communication platform:
+Konferans is designed as a gaming-first communication platform:
 
 - Discord-like persistent servers/channels.
 - Jitsi-like instant meeting controls.

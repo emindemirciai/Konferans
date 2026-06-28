@@ -9,13 +9,13 @@ BACKUP_DIR=./backups bash scripts/backup-postgres.sh
 The script creates:
 
 ```text
-./backups/letsmeet-YYYYMMDD-HHMMSS.sql.gz
+./backups/konferans-YYYYMMDD-HHMMSS.sql.gz
 ```
 
 ## Restore
 
 ```bash
-bash scripts/restore-postgres.sh ./backups/letsmeet-YYYYMMDD-HHMMSS.sql.gz
+bash scripts/restore-postgres.sh ./backups/konferans-YYYYMMDD-HHMMSS.sql.gz
 ```
 
 ## Dokploy/VPS note

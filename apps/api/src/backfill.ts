@@ -6,16 +6,16 @@ async function backfill() {
   const servers = await prisma.server.findMany({ include: { channels: true } });
   
   for (const server of servers) {
-    const hasLetsMeet = server.channels.some((c: any) => c.name.toLowerCase() === "let's meet" && c.type === 'VOICE');
+    const hasConference = server.channels.some((c: any) => c.name.toLowerCase() === 'konferans' && c.type === 'VOICE');
     const hasAfk = server.channels.some((c: any) => c.name.toLowerCase() === 'afk' && c.type === 'VOICE');
     
     let position = server.channels.length + 1;
     
-    if (!hasLetsMeet) {
+    if (!hasConference) {
       await prisma.channel.create({
         data: {
           serverId: server.id,
-          name: "Let's Meet",
+          name: "Konferans",
           type: 'VOICE',
           position: position++,
           category: 'Ses',
@@ -25,7 +25,7 @@ async function backfill() {
           lowLatencyMode: true
         }
       });
-      console.log(`Added Let's Meet to server ${server.name}`);
+      console.log(`Added Konferans to server ${server.name}`);
     }
     
     if (!hasAfk) {

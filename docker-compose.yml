@@ -3,13 +3,13 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-letsmeet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-letsmeet_password}
-      POSTGRES_DB: ${POSTGRES_DB:-letsmeet}
+      POSTGRES_USER: ${POSTGRES_USER:-konferans}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-konferans_password}
+      POSTGRES_DB: ${POSTGRES_DB:-konferans}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-letsmeet} -d ${POSTGRES_DB:-letsmeet}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-konferans} -d ${POSTGRES_DB:-konferans}"]
       interval: 10s
       timeout: 5s
       retries: 5

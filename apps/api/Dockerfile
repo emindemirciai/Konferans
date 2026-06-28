@@ -6,13 +6,13 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/api/package.json apps/api/package.json
-RUN pnpm install --filter @lets-meet/shared --filter @lets-meet/api... --include-workspace-root --frozen-lockfile=false --prod=false
+RUN pnpm install --filter @konferans/shared --filter @konferans/api... --include-workspace-root --frozen-lockfile=false --prod=false
 
 FROM deps AS build
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 RUN ./node_modules/.bin/tsc -p packages/shared/tsconfig.json
-RUN pnpm --filter @lets-meet/api prisma:generate
+RUN pnpm --filter @konferans/api prisma:generate
 RUN ./node_modules/.bin/tsc -p apps/api/tsconfig.json
 
 FROM base AS runner

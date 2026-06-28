@@ -74,13 +74,13 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
 
   return (
     <div className="login-card">
-      <h1>Let's Meet</h1>
+      <h1>Konferans</h1>
       <p>Oyuncular için hafif, hızlı, ses/video ve ekran paylaşımı odaları.</p>
 
       {mode !== 'login' && (
         <div className="field">
           <label>Davet kodu</label>
-          <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="LM-..." />
+          <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="KF-..." />
         </div>
       )}
       {mode === 'register' && (

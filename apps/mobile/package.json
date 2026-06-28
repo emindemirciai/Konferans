@@ -1,5 +1,5 @@
 {
-  "name": "@lets-meet/mobile",
+  "name": "@konferans/mobile",
   "version": "0.4.0",
   "private": true,
   "main": "src/App.tsx",
@@ -13,7 +13,7 @@
   "dependencies": {
     "@livekit/react-native": "^2.9.0",
     "@livekit/react-native-webrtc": "^125.0.0",
-    "@lets-meet/shared": "workspace:*",
+    "@konferans/shared": "workspace:*",
     "expo": "^53.0.0",
     "expo-av": "^15.0.0",
     "expo-constants": "^17.1.8",

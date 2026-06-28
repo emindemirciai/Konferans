@@ -1,5 +1,5 @@
 {
-  "name": "@lets-meet/web",
+  "name": "@konferans/web",
   "version": "0.4.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@livekit/components-react": "^2.9.0",
     "@livekit/components-styles": "^1.1.5",
-    "@lets-meet/shared": "workspace:*",
+    "@konferans/shared": "workspace:*",
     "livekit-client": "^2.9.0",
     "lucide-react": "^0.475.0",
     "next": "^16.0.0",

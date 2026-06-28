@@ -10,7 +10,7 @@ export function getSocket(token: string) {
   }
   if (!bridgeAttached && typeof window !== 'undefined') {
     bridgeAttached = true;
-    window.addEventListener('letsmeet:voice-state', ((event: CustomEvent) => {
+    window.addEventListener('konferans:voice-state', ((event: CustomEvent) => {
       socket?.emit('voice:state', event.detail);
     }) as EventListener);
   }

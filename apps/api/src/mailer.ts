@@ -20,7 +20,7 @@ export async function sendVerificationEmail(email: string, code: string) {
   await transport.sendMail({
     from: env.SMTP_FROM,
     to: email,
-    subject: "Let's Meet doğrulama kodu",
-    text: `Let's Meet doğrulama kodun: ${code}. Kod 10 dakika geçerlidir.`,
+    subject: "Konferans doğrulama kodu",
+    text: `Konferans doğrulama kodun: ${code}. Kod 10 dakika geçerlidir.`,
   });
 }

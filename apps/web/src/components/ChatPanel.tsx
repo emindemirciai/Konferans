@@ -55,7 +55,7 @@ export function ChatPanel({ token, channel }: { token: string; channel: { id: st
     const composer = composerRef.current;
     if (!composer) return;
     composer.style.height = 'auto';
-    composer.style.height = `${Math.min(composer.scrollHeight, 168)}px`;
+    composer.style.height = `${Math.min(composer.scrollHeight, 220)}px`;
   }, [content]);
 
   function onChange(value: string) {

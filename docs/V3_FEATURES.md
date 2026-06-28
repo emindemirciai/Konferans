@@ -1,6 +1,6 @@
-# Lets Meet v3 Feature Layer
+# Konferans v3 Feature Layer
 
-v3 turns Lets Meet from a working communication app into an integration-ready product.
+v3 turns Konferans from a working communication app into an integration-ready product.
 
 ## Added capabilities
 
@@ -28,14 +28,14 @@ The repo stores push subscription records and integration credentials. Actual pr
 2. Admin creates an integration app.
 3. The API returns `clientId` and a one-time `clientSecret`.
 4. Existing website stores these values securely server-side.
-5. Website can request/bridge SSO sessions and show the Lets Meet widget.
+5. Website can request/bridge SSO sessions and show the Konferans widget.
 
 ## SSO flow
 
-1. Lets Meet authenticated user calls `/api/sso/sessions`.
+1. Konferans authenticated user calls `/api/sso/sessions`.
 2. API returns a short-lived one-time `sso_...` token.
 3. Website or embed frame consumes it through `/api/sso/consume/:token`.
-4. API returns a normal Lets Meet JWT for the same user.
+4. API returns a normal Konferans JWT for the same user.
 
 ## Embed flow
 

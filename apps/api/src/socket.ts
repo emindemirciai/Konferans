@@ -1,15 +1,51 @@
 import type { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
-import { CreateDirectMessageSchema, CreateMessageSchema } from '@lets-meet/shared';
+import { CreateDirectMessageSchema, CreateMessageSchema } from '@konferans/shared';
 import { env } from './env.js';
 import { verifyToken } from './auth.js';
 import { prisma } from './db.js';
 
 export type VoiceState = { userId: string; name: string; channelId: string; serverId: string; muted: boolean; deafened: boolean; camera: boolean; screenShare: boolean };
 const voiceStates = new Map<string, Map<string, VoiceState>>();
+const userSockets = new Map<string, Set<string>>();
+const offlineTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const OFFLINE_GRACE_MS = 30000;
 
 async function activeMember(userId: string, serverId: string) {
   return prisma.serverMember.findUnique({ where: { serverId_userId: { serverId, userId } } }).then((m) => (m?.status === 'ACTIVE' ? m : null));
+}
+
+function clearOfflineTimer(userId: string) {
+  const timer = offlineTimers.get(userId);
+  if (!timer) return;
+  clearTimeout(timer);
+  offlineTimers.delete(userId);
+}
+
+function addUserSocket(userId: string, socketId: string) {
+  clearOfflineTimer(userId);
+  const sockets = userSockets.get(userId) ?? new Set<string>();
+  sockets.add(socketId);
+  userSockets.set(userId, sockets);
+}
+
+function removeUserSocket(userId: string, socketId: string) {
+  const sockets = userSockets.get(userId);
+  if (!sockets) return false;
+  sockets.delete(socketId);
+  if (sockets.size > 0) return true;
+  userSockets.delete(userId);
+  return false;
+}
+
+function removeUserVoiceStates(userId: string, io: Server) {
+  for (const [serverId, states] of voiceStates) {
+    const state = states.get(userId);
+    if (!state) continue;
+    states.delete(userId);
+    io.to(`server:${serverId}`).emit('voice:remove', { userId, channelId: state.channelId });
+    if (states.size === 0) voiceStates.delete(serverId);
+  }
 }
 
 export function attachSocket(server: HttpServer) {
@@ -17,6 +53,9 @@ export function attachSocket(server: HttpServer) {
     cors: {
       origin: env.CORS_ORIGIN.split(',').map((x) => x.trim()),
       credentials: true,
+    },
+    connectionStateRecovery: {
+      maxDisconnectionDuration: OFFLINE_GRACE_MS,
     },
   });
 
@@ -33,6 +72,7 @@ export function attachSocket(server: HttpServer) {
 
   io.on('connection', async (socket) => {
     const user = socket.data.user;
+    addUserSocket(user.id, socket.id);
     socket.join(`user:${user.id}`);
     await prisma.user.update({ where: { id: user.id }, data: { presenceStatus: 'ONLINE', lastSeenAt: new Date() } }).catch(() => null);
     io.emit('presence:update', { userId: user.id, name: user.name, status: 'ONLINE' });
@@ -205,15 +245,17 @@ export function attachSocket(server: HttpServer) {
     });
 
     socket.on('disconnect', async () => {
-      await prisma.user.update({ where: { id: user.id }, data: { presenceStatus: 'OFFLINE', lastSeenAt: new Date() } }).catch(() => null);
-      io.emit('presence:update', { userId: user.id, name: user.name, status: 'OFFLINE' });
-      
-      const vChanId = socket.data.currentVoiceChannelId;
-      const vSrvId = socket.data.currentVoiceServerId;
-      if (vChanId && vSrvId && voiceStates.has(vSrvId)) {
-        voiceStates.get(vSrvId)!.delete(user.id);
-        io.to(`server:${vSrvId}`).emit('voice:remove', { userId: user.id, channelId: vChanId });
-      }
+      const hasAnotherActiveSocket = removeUserSocket(user.id, socket.id);
+      if (hasAnotherActiveSocket) return;
+
+      clearOfflineTimer(user.id);
+      offlineTimers.set(user.id, setTimeout(async () => {
+        offlineTimers.delete(user.id);
+        if (userSockets.get(user.id)?.size) return;
+        await prisma.user.update({ where: { id: user.id }, data: { presenceStatus: 'OFFLINE', lastSeenAt: new Date() } }).catch(() => null);
+        io.emit('presence:update', { userId: user.id, name: user.name, status: 'OFFLINE' });
+        removeUserVoiceStates(user.id, io);
+      }, OFFLINE_GRACE_MS));
     });
   });
 

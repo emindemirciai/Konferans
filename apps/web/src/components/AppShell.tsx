@@ -121,6 +121,7 @@ export function AppShell() {
   const [panel, setPanel] = useState<Panel>('chat');
   const [compactMode, setCompactMode] = useState(false);
   const [cinematicMode, setCinematicMode] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
   const [channelMenu, setChannelMenu] = useState<{ x: number; y: number; channel: Channel } | null>(null);
   const [memberMenu, setMemberMenu] = useState<{ x: number; y: number; member: Member } | null>(null);
   const [voiceUserMenu, setVoiceUserMenu] = useState<{ x: number; y: number; voiceUser: VoiceState } | null>(null);
@@ -189,6 +190,24 @@ export function AppShell() {
   }, [activeServer?.server.id, globalSocket]);
 
   useEffect(() => {
+    if (!globalSocket) return;
+    const rejoinActiveRooms = () => {
+      if (activeServer) {
+        globalSocket.emit('server:join', { serverId: activeServer.server.id });
+      }
+      if (myVoiceState) {
+        globalSocket.emit('voice:join', { channelId: myVoiceState.channelId });
+      }
+    };
+
+    globalSocket.on('connect', rejoinActiveRooms);
+    if (globalSocket.connected) rejoinActiveRooms();
+    return () => {
+      globalSocket.off('connect', rejoinActiveRooms);
+    };
+  }, [activeServer?.server.id, globalSocket, myVoiceState?.channelId]);
+
+  useEffect(() => {
     const handleNavFriends = () => { setActiveServer(null); setPanel('friends'); };
     const handleNavDirect = (event: any) => {
       const user = event.detail?.user;
@@ -255,33 +274,39 @@ export function AppShell() {
     const onCinematic = (e: any) => {
       setCinematicMode(e.detail.active);
     };
-    window.addEventListener('letsmeet:cinematic-mode', onCinematic);
+    window.addEventListener('konferans:cinematic-mode', onCinematic);
+
+    const onFullscreen = (e: any) => {
+      setFullscreenMode(Boolean(e.detail.active));
+    };
+    window.addEventListener('konferans:fullscreen-mode', onFullscreen);
 
     const onLeaveChannel = () => {
       setActiveChannel(null);
       setPanel('chat');
     };
-    window.addEventListener('letsmeet:leave-channel', onLeaveChannel);
+    window.addEventListener('konferans:leave-channel', onLeaveChannel);
     
     s.on('voice:force_move', ({ channelId }: { channelId: string }) => {
-      window.dispatchEvent(new CustomEvent('letsmeet:force-move', { detail: { channelId } }));
+      window.dispatchEvent(new CustomEvent('konferans:force-move', { detail: { channelId } }));
     });
 
     const onVoiceJoin = (e: any) => s.emit('voice:join', { channelId: e.detail.channelId });
     const onVoiceLeave = (e: any) => s.emit('voice:leave', { channelId: e.detail.channelId });
     const onVoiceState = (e: any) => s.emit('voice:state', e.detail);
 
-    window.addEventListener('letsmeet:voice-join', onVoiceJoin);
-    window.addEventListener('letsmeet:voice-leave', onVoiceLeave);
-    window.addEventListener('letsmeet:voice-state', onVoiceState);
+    window.addEventListener('konferans:voice-join', onVoiceJoin);
+    window.addEventListener('konferans:voice-leave', onVoiceLeave);
+    window.addEventListener('konferans:voice-state', onVoiceState);
 
     return () => { 
       document.removeEventListener('click', handleGlobalClick);
-      window.removeEventListener('letsmeet:cinematic-mode', onCinematic);
-      window.removeEventListener('letsmeet:leave-channel', onLeaveChannel);
-      window.removeEventListener('letsmeet:voice-join', onVoiceJoin);
-      window.removeEventListener('letsmeet:voice-leave', onVoiceLeave);
-      window.removeEventListener('letsmeet:voice-state', onVoiceState);
+      window.removeEventListener('konferans:cinematic-mode', onCinematic);
+      window.removeEventListener('konferans:fullscreen-mode', onFullscreen);
+      window.removeEventListener('konferans:leave-channel', onLeaveChannel);
+      window.removeEventListener('konferans:voice-join', onVoiceJoin);
+      window.removeEventListener('konferans:voice-leave', onVoiceLeave);
+      window.removeEventListener('konferans:voice-state', onVoiceState);
       s.disconnect(); 
     };
   }, []);
@@ -293,11 +318,11 @@ export function AppShell() {
       if (ch) {
         setActiveChannel(ch);
         setPanel('chat');
-        window.dispatchEvent(new CustomEvent('letsmeet:voice-join', { detail: { channelId: chId } }));
+        window.dispatchEvent(new CustomEvent('konferans:voice-join', { detail: { channelId: chId } }));
       }
     };
-    window.addEventListener('letsmeet:force-move', handler);
-    return () => window.removeEventListener('letsmeet:force-move', handler);
+    window.addEventListener('konferans:force-move', handler);
+    return () => window.removeEventListener('konferans:force-move', handler);
   }, [activeServer]);
 
   useEffect(() => {
@@ -307,7 +332,7 @@ export function AppShell() {
     
     if (myState.muted) {
       const timer = setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('letsmeet:force-move', { detail: { channelId: afkChannel.id } }));
+        window.dispatchEvent(new CustomEvent('konferans:force-move', { detail: { channelId: afkChannel.id } }));
       }, 15 * 60 * 1000);
       return () => clearTimeout(timer);
     }
@@ -337,7 +362,7 @@ export function AppShell() {
 
   async function joinInvite() {
     if (!token) return;
-    const code = prompt('Davet kodu veya LM-...');
+    const code = prompt('Davet kodu veya KF-...');
     if (!code) return;
     const data = await api<{ serverId: string }>('/invites/join', { token, method: 'POST', body: JSON.stringify({ code }) });
     const serversData = await api<{ servers: Server[] }>('/servers', { token });
@@ -370,7 +395,7 @@ export function AppShell() {
 
   function leaveCurrentVoiceChannel() {
     if (!myVoiceState || !currentUser) return;
-    window.dispatchEvent(new CustomEvent('letsmeet:voice-leave', { detail: { channelId: myVoiceState.channelId } }));
+    window.dispatchEvent(new CustomEvent('konferans:voice-leave', { detail: { channelId: myVoiceState.channelId } }));
     setVoiceStates((prev) => prev.filter((state) => state.userId !== currentUser.id));
     if (activeChannel?.id === myVoiceState.channelId) {
       setActiveChannel(null);
@@ -379,13 +404,13 @@ export function AppShell() {
   }
 
   function handleLocalMute(userId: string) {
-    const list = JSON.parse(localStorage.getItem('letsmeet:local-muted') || '[]');
+    const list = JSON.parse(localStorage.getItem('konferans:local-muted') || '[]');
     if (list.includes(userId)) {
-      localStorage.setItem('letsmeet:local-muted', JSON.stringify(list.filter((id: string) => id !== userId)));
+      localStorage.setItem('konferans:local-muted', JSON.stringify(list.filter((id: string) => id !== userId)));
     } else {
-      localStorage.setItem('letsmeet:local-muted', JSON.stringify([...list, userId]));
+      localStorage.setItem('konferans:local-muted', JSON.stringify([...list, userId]));
     }
-    window.dispatchEvent(new CustomEvent('letsmeet:local-mute-change'));
+    window.dispatchEvent(new CustomEvent('konferans:local-mute-change'));
   }
 
   function handleForceMute(userId: string, channelId: string) {
@@ -422,7 +447,7 @@ export function AppShell() {
     if (!token || !activeServer) return;
     const channelToDelete = activeServer.server.channels.find(c => c.id === channelId);
     
-    const protectedNames = ['genel', "let's meet", 'afk'];
+    const protectedNames = ['genel', 'konferans', 'afk'];
     if (channelToDelete && protectedNames.includes(name.toLowerCase())) {
       alert(`'${name}' isimli varsayılan kanal silinemez.`);
       return;
@@ -478,7 +503,7 @@ export function AppShell() {
         setActiveChannel(targetChannel);
         setPanel('chat');
       }
-      window.dispatchEvent(new CustomEvent('letsmeet:voice-join', { detail: { channelId: targetChannelId } }));
+      window.dispatchEvent(new CustomEvent('konferans:voice-join', { detail: { channelId: targetChannelId } }));
     } else {
       globalSocket?.emit('voice:force_move', { targetUserId, targetChannelId });
     }
@@ -499,9 +524,10 @@ export function AppShell() {
   );
 
   if (!token) return null;
+  const isVoicePanel = panel === 'chat' && activeChannel?.type === 'VOICE';
 
   return (
-    <div className={`app ${compactMode ? 'compact-mode' : ''} ${cinematicMode ? 'cinematic-mode' : ''}`}>
+    <div className={`app ${compactMode ? 'compact-mode' : ''} ${cinematicMode ? 'cinematic-mode' : ''} ${fullscreenMode ? 'fullscreen-mode' : ''}`}>
       <aside className="serverbar">
         <button className={`server-pill ${activeServer === null ? 'active' : ''}`} onClick={() => { setActiveServer(null); setPanel('messages'); }} title="Ana Sayfa" style={{ flexShrink: 0 }}>
           <Home size={22} />
@@ -606,7 +632,7 @@ export function AppShell() {
                   {channelUsers.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0', marginBottom: '8px' }}>
                       {channelUsers.map(vu => {
-                        const isLocalMuted = (JSON.parse(localStorage.getItem('letsmeet:local-muted') || '[]')).includes(vu.userId);
+                        const isLocalMuted = (JSON.parse(localStorage.getItem('konferans:local-muted') || '[]')).includes(vu.userId);
                         const canDrag = canMoveVoiceUserInActiveServer(vu.userId);
                         return (
                           <VoiceUserItem 
@@ -723,10 +749,12 @@ export function AppShell() {
         )}
       </aside>
 
-      <main className="main">
-        <div className="topbar">
-          <strong>{panel !== 'chat' ? panelTitle(panel) : activeChannel ? `${activeChannel.type === 'TEXT' ? '#' : '🔊'} ${activeChannel.name}` : 'Kanal seç'}</strong>
-        </div>
+      <main className={`main ${isVoicePanel ? 'voice-main' : ''}`}>
+        {!isVoicePanel && (
+          <div className="topbar">
+            <strong>{panel !== 'chat' ? panelTitle(panel) : activeChannel ? `${activeChannel.type === 'TEXT' ? '#' : '🔊'} ${activeChannel.name}` : 'Kanal seç'}</strong>
+          </div>
+        )}
         <div className="content">
           {panel === 'chat' && activeChannel?.type === 'TEXT' && <ChatPanel token={token} channel={activeChannel} />}
           {panel === 'chat' && activeChannel?.type === 'VOICE' && (
@@ -735,7 +763,7 @@ export function AppShell() {
                 <VoiceRoom token={token} channel={activeChannel} />
               </div>
               {activeChannel.name.toLowerCase() !== 'afk' && (
-                <div style={{ width: '320px', minWidth: 0, maxWidth: '38%', flexShrink: 0, overflow: 'hidden', borderLeft: '1px solid #3f4147', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ width: '380px', minWidth: 0, maxWidth: '44%', flexShrink: 0, overflow: 'hidden', borderLeft: '1px solid #3f4147', display: 'flex', flexDirection: 'column' }}>
                   <ChatPanel token={token} channel={activeChannel} />
                 </div>
               )}
@@ -800,7 +828,7 @@ export function AppShell() {
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => openDirectMessage({ id: voiceUserMenu.voiceUser.userId, name: voiceUserMenu.voiceUser.name })}>Özel Mesaj Gönder</button>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => handleAddFriend(voiceUserMenu.voiceUser.userId)}>Arkadaş Ekle</button>
           <button style={{ backgroundColor: 'transparent', color: '#dcddde', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4752c4'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#dcddde'; }} onClick={() => handleLocalMute(voiceUserMenu.voiceUser.userId)}>
-            { (JSON.parse(localStorage.getItem('letsmeet:local-muted') || '[]')).includes(voiceUserMenu.voiceUser.userId) ? 'Yerel Sesi Aç' : 'Yerel Sesi Kapat' }
+            { (JSON.parse(localStorage.getItem('konferans:local-muted') || '[]')).includes(voiceUserMenu.voiceUser.userId) ? 'Yerel Sesi Aç' : 'Yerel Sesi Kapat' }
           </button>
           {canManage && (
             <button style={{ backgroundColor: 'transparent', color: '#ed4245', border: 'none', padding: '8px 12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', fontSize: '14px' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ed4245'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#ed4245'; }} onClick={() => handleForceMute(voiceUserMenu.voiceUser.userId, voiceUserMenu.voiceUser.channelId)}>
@@ -855,5 +883,5 @@ function panelTitle(panel: Panel) {
   if (panel === 'notifications') return 'Bildirimler';
   if (panel === 'admin') return 'Sunucu yönetimi';
   if (panel === 'integrations') return 'Site entegrasyonu';
-  return "Let's Meet";
+  return "Konferans";
 }

@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "Let's Meet",
-    "slug": "lets-meet",
-    "scheme": "letsmeet",
+    "name": "Konferans",
+    "slug": "konferans",
+    "scheme": "konferans",
     "version": "0.4.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.letsmeet.app",
+      "bundleIdentifier": "com.konferans.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Let's Meet kamera ile görüntülü görüşme için kameraya erişir.",
-        "NSMicrophoneUsageDescription": "Let's Meet sesli görüşme için mikrofona erişir."
+        "NSCameraUsageDescription": "Konferans kamera ile görüntülü görüşme için kameraya erişir.",
+        "NSMicrophoneUsageDescription": "Konferans sesli görüşme için mikrofona erişir."
       }
     },
     "android": {
-      "package": "com.letsmeet.app",
+      "package": "com.konferans.app",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

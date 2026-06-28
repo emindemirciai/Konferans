@@ -27,7 +27,7 @@ import {
   UpdateMemberRoleSchema,
   UpdateMessageSchema,
   UserSettingsSchema,
-} from '@lets-meet/shared';
+} from '@konferans/shared';
 import { allowPublicRegistration, env, isInviteOnly } from './env.js';
 import { prisma } from './db.js';
 import { canAdmin, canManage, canModerate, requireAuth, requireServerMember, signToken } from './auth.js';
@@ -94,7 +94,7 @@ async function autoCreateUserServer(userId: string, userName: string) {
       channels: {
         create: [
           { name: 'Genel', type: 'TEXT', position: 1 },
-          { name: "Let's Meet", type: 'VOICE', position: 2, bitrate: 64000, allowVideo: true, allowScreenShare: true, lowLatencyMode: true },
+          { name: "Konferans", type: 'VOICE', position: 2, bitrate: 64000, allowVideo: true, allowScreenShare: true, lowLatencyMode: true },
           { name: 'AFK', type: 'VOICE', position: 3, bitrate: 64000, allowVideo: false, allowScreenShare: false, lowLatencyMode: true },
         ],
       },
@@ -127,7 +127,7 @@ async function canUseChannel(userId: string, channelId: string, capability: 'vie
 }
 
 router.get('/health', (_req, res) => {
-  res.json({ ok: true, name: "Let's Meet API", version: '0.4.0', time: new Date().toISOString() });
+  res.json({ ok: true, name: "Konferans API", version: '0.4.0', time: new Date().toISOString() });
 });
 
 router.post('/auth/register', async (req, res) => {
@@ -276,7 +276,7 @@ router.post('/servers', requireAuth, async (req, res) => {
         channels: {
           create: [
             { name: 'Genel', type: 'TEXT', position: 1, category: 'Genel' },
-            { name: "Let's Meet", type: 'VOICE', position: 2, category: 'Ses', bitrate: 64000, allowVideo: true, allowScreenShare: true, lowLatencyMode: true },
+            { name: "Konferans", type: 'VOICE', position: 2, category: 'Ses', bitrate: 64000, allowVideo: true, allowScreenShare: true, lowLatencyMode: true },
             { name: 'AFK', type: 'VOICE', position: 3, category: 'Ses', bitrate: 64000, allowVideo: false, allowScreenShare: false, lowLatencyMode: true },
           ],
         },
@@ -412,7 +412,7 @@ router.post('/servers/:serverId/invites', requireAuth, async (req, res) => {
     const input = schema.parse(req.body ?? {});
     const invite = await prisma.invite.create({
       data: {
-        code: `LM-${nanoid(10)}`,
+        code: `KF-${nanoid(10)}`,
         scope: 'SERVER',
         serverId: (req.params.serverId as string),
         createdById: req.user!.id,
@@ -752,7 +752,7 @@ router.post('/direct/:userId/messages', requireAuth, async (req, res) => {
 
 router.get('/config', (_req, res) => {
   res.json({
-    name: "Let's Meet",
+    name: "Konferans",
     version: '0.4.0',
     inviteOnly: isInviteOnly,
     allowPublicRegistration,
@@ -1041,16 +1041,16 @@ router.get('/system/backfill', async (req, res) => {
   const servers = await prisma.server.findMany({ include: { channels: true } });
   
   for (const server of servers) {
-    const hasLetsMeet = server.channels.some((c: any) => c.name.toLowerCase() === "let's meet" && c.type === 'VOICE');
+    const hasConference = server.channels.some((c: any) => c.name.toLowerCase() === 'konferans' && c.type === 'VOICE');
     const hasAfk = server.channels.some((c: any) => c.name.toLowerCase() === 'afk' && c.type === 'VOICE');
     
     let position = server.channels.length + 1;
     
-    if (!hasLetsMeet) {
+    if (!hasConference) {
       await prisma.channel.create({
         data: {
           serverId: server.id,
-          name: "Let's Meet",
+          name: "Konferans",
           type: 'VOICE',
           position: position++,
           category: 'Ses',
@@ -1101,7 +1101,7 @@ router.delete('/channels/:channelId', requireAuth, async (req, res) => {
     const channel = await prisma.channel.findUnique({ where: { id: (req.params.channelId as string) } });
     if (!channel) return res.status(404).json({ message: 'Kanal bulunamadı.' });
     
-    const protectedNames = ['genel', "let's meet", 'afk'];
+    const protectedNames = ['genel', 'konferans', 'afk'];
     if (protectedNames.includes(channel.name.toLowerCase())) {
       return res.status(403).json({ message: 'Bu varsayılan kanal silinemez.' });
     }

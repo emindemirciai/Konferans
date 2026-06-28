@@ -1,17 +1,17 @@
 {
-  "name": "lets-meet",
+  "name": "konferans",
   "private": true,
   "version": "0.4.0",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "pnpm -r --parallel --filter @lets-meet/api --filter @lets-meet/web dev",
+    "dev": "pnpm -r --parallel --filter @konferans/api --filter @konferans/web dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "prisma:generate": "pnpm --filter @lets-meet/api prisma:generate",
-    "db:push": "pnpm --filter @lets-meet/api db:push",
-    "db:seed": "pnpm --filter @lets-meet/api db:seed",
+    "prisma:generate": "pnpm --filter @konferans/api prisma:generate",
+    "db:push": "pnpm --filter @konferans/api db:push",
+    "db:seed": "pnpm --filter @konferans/api db:seed",
     "check": "pnpm lint && pnpm build",
-    "db:studio": "pnpm --filter @lets-meet/api prisma:studio",
+    "db:studio": "pnpm --filter @konferans/api prisma:studio",
     "backup:db": "bash scripts/backup-postgres.sh",
     "restore:db": "bash scripts/restore-postgres.sh"
   },

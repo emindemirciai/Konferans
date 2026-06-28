@@ -14,7 +14,7 @@ importers:
 
   apps/api:
     dependencies:
-      '@lets-meet/shared':
+      '@konferans/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@prisma/client':
@@ -99,7 +99,7 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@lets-meet/shared':
+      '@konferans/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@livekit/react-native':
@@ -145,7 +145,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@lets-meet/shared':
+      '@konferans/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@livekit/components-react':

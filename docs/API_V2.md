@@ -1,4 +1,4 @@
-# Lets Meet v2 API Map
+# Konferans v2 API Map
 
 All paths are under `/api`.
 

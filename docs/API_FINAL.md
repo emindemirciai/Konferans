@@ -1,4 +1,4 @@
-# Lets Meet Final API Map
+# Konferans Final API Map
 
 Base path: `/api`
 

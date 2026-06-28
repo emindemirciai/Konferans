@@ -6,9 +6,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.SEED_ADMIN_EMAIL || 'admin@letsmeet.local';
+  const email = process.env.SEED_ADMIN_EMAIL || 'admin@konferans.local';
   const password = process.env.SEED_ADMIN_PASSWORD || 'ChangeMe123!';
-  const name = process.env.SEED_ADMIN_NAME || "Let's Meet Admin";
+  const name = process.env.SEED_ADMIN_NAME || "Konferans Admin";
   const passwordHash = await bcrypt.hash(password, 12);
 
   const admin = await prisma.user.upsert({
@@ -30,10 +30,10 @@ async function main() {
   });
 
   const server = await prisma.server.upsert({
-    where: { slug: 'lets-meet-hq' },
+    where: { slug: 'konferans-hq' },
     create: {
-      name: "Let's Meet HQ",
-      slug: 'lets-meet-hq',
+      name: "Konferans HQ",
+      slug: 'konferans-hq',
       ownerId: admin.id,
       members: { create: { userId: admin.id, role: 'OWNER' } },
       channels: {
@@ -52,7 +52,7 @@ async function main() {
     update: { enabled: true, allowGuestPreview: true, theme: 'gaming' },
   });
 
-  const inviteCode = `LM-${nanoid(10)}`;
+  const inviteCode = `KF-${nanoid(10)}`;
   await prisma.invite.create({
     data: {
       code: inviteCode,

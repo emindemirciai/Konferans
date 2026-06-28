@@ -1,13 +1,13 @@
 # Website Integration Plan
 
-Lets Meet is prepared for website integration in four levels.
+Konferans is prepared for website integration in four levels.
 
 ## Level 1: Link integration
 
 Add a button on your existing website:
 
 ```html
-<a href="https://meet.example.com">Lets Meet'e gir</a>
+<a href="https://meet.example.com">Konferans'a gir</a>
 ```
 
 ## Level 2: Invite integration
@@ -15,7 +15,7 @@ Add a button on your existing website:
 Create invite links from the app/API and publish them on your site:
 
 ```text
-https://meet.example.com/invite/LM-xxxxxxxxxx
+https://meet.example.com/invite/KF-xxxxxxxxxx
 ```
 
 ## Level 3: Embedded launcher widget
@@ -41,7 +41,7 @@ Example iframe:
 
 ## Level 4: SSO integration later
 
-For deep integration with an existing website, keep Lets Meet as a separate auth/media service and let your website issue a short-lived signed token to the Lets Meet API. The current repo already separates:
+For deep integration with an existing website, keep Konferans as a separate auth/media service and let your website issue a short-lived signed token to the Konferans API. The current repo already separates:
 
 - public web client
 - API

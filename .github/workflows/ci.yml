@@ -1,4 +1,4 @@
-name: Lets Meet CI
+name: Konferans CI
 
 on:
   push:
@@ -18,6 +18,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile=false
       - run: pnpm prisma:generate
-      - run: pnpm --filter @lets-meet/shared build
+      - run: pnpm --filter @konferans/shared build
       - run: pnpm lint
       - run: pnpm build

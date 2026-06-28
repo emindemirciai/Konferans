@@ -95,7 +95,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.screen}>
         <View style={styles.card}>
-          <Text style={styles.title}>Let's Meet</Text>
+          <Text style={styles.title}>Konferans</Text>
           <Text style={styles.muted}>Native Android/iOS oyuncu ses, video ve ekran paylaşımı.</Text>
           <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="E-posta" placeholderTextColor="#8d94a6" autoCapitalize="none" />
           <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Şifre" placeholderTextColor="#8d94a6" secureTextEntry />
@@ -109,7 +109,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Let's Meet</Text>
+        <Text style={styles.title}>Konferans</Text>
         <View style={styles.card}>
           <Text style={styles.subtitle}>Mobil oyun modu</Text>
           <Row label="Düşük güç" value={Boolean(settings.lowPowerMode)} onValueChange={() => toggleSetting('lowPowerMode')} />
@@ -118,7 +118,7 @@ export default function App() {
           <Row label="Mobil veri tasarrufu" value={Boolean(settings.mobileDataSaver)} onValueChange={() => toggleSetting('mobileDataSaver')} />
         </View>
         <View style={styles.inviteBox}>
-          <TextInput style={styles.input} value={inviteCode} onChangeText={setInviteCode} placeholder="LM- davet kodu" placeholderTextColor="#8d94a6" />
+          <TextInput style={styles.input} value={inviteCode} onChangeText={setInviteCode} placeholder="KF- davet kodu" placeholderTextColor="#8d94a6" />
           <TouchableOpacity style={styles.button} onPress={joinInvite}><Text style={styles.buttonText}>Katıl</Text></TouchableOpacity>
         </View>
         <Text style={styles.subtitle}>Sunucular</Text>

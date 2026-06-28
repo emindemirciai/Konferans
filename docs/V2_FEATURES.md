@@ -1,4 +1,4 @@
-# Lets Meet v2 Feature Layer
+# Konferans v2 Feature Layer
 
 This file documents the second development layer added on top of the clean repo.
 

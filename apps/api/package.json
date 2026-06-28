@@ -1,5 +1,5 @@
 {
-  "name": "@lets-meet/api",
+  "name": "@konferans/api",
   "version": "0.4.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "test:types": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@lets-meet/shared": "workspace:*",
+    "@konferans/shared": "workspace:*",
     "@prisma/client": "^6.4.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",

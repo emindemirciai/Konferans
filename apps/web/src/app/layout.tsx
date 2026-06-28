@@ -3,7 +3,7 @@ import '@livekit/components-styles';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: "Let's Meet",
+  title: "Konferans",
   description: 'Discord-style voice, video and screen sharing for gamers.',
   manifest: '/manifest.webmanifest',
 };

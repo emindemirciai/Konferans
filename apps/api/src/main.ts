@@ -18,12 +18,12 @@ app.use(express.json({ limit: env.MAX_JSON_BODY }));
 app.use(cookieParser());
 app.use(morgan('tiny'));
 app.use(simpleRateLimit);
-app.get('/health', (_req, res) => res.json({ ok: true, name: "Let's Meet API", version: '0.4.0' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: "Konferans API", version: '0.4.0' }));
 app.use('/api', router);
 
 const server = http.createServer(app);
 attachSocket(server);
 
 server.listen(env.API_PORT, () => {
-  console.log(`Let's Meet API listening on :${env.API_PORT}`);
+  console.log(`Konferans API listening on :${env.API_PORT}`);
 });

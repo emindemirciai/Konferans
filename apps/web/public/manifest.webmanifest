@@ -1,6 +1,6 @@
 {
-  "name": "Lets Meet",
-  "short_name": "Lets Meet",
+  "name": "Konferans",
+  "short_name": "Konferans",
   "start_url": "/app",
   "display": "standalone",
   "background_color": "#0e1015",

@@ -1,6 +1,6 @@
-# Let's Meet
+# Konferans
 
-Let's Meet; topluluklar, ekipler ve oyun grupları için geliştirilen Discord benzeri, self-host edilebilir bir iletişim platformudur. Web arayüzü, Express API, Socket.IO gerçek zamanlı olayları, PostgreSQL/Prisma veri katmanı ve LiveKit tabanlı ses/görüntü altyapısı tek bir monorepo içinde tutulur.
+Konferans; topluluklar, ekipler ve oyun grupları için geliştirilen Discord benzeri, self-host edilebilir bir iletişim platformudur. Web arayüzü, Express API, Socket.IO gerçek zamanlı olayları, PostgreSQL/Prisma veri katmanı ve LiveKit tabanlı ses/görüntü altyapısı tek bir monorepo içinde tutulur.
 
 ## Güncel Durum
 

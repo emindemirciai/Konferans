@@ -14,13 +14,13 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
 export function getToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('letsmeet_token');
+  return localStorage.getItem('konferans_token');
 }
 
 export function setToken(token: string) {
-  localStorage.setItem('letsmeet_token', token);
+  localStorage.setItem('konferans_token', token);
 }
 
 export function clearToken() {
-  localStorage.removeItem('letsmeet_token');
+  localStorage.removeItem('konferans_token');
 }
