@@ -501,6 +501,10 @@ button {
   flex: 0 0 auto;
 }
 
+.cinematic-mode:not(.fullscreen-mode) .custom-stage {
+  padding-block: clamp(10px, 1.2vh, 18px);
+}
+
 .cinematic-mode .voice-chat-pane {
   width: clamp(280px, 22vw, 340px);
   max-width: 30vw;
@@ -1557,57 +1561,6 @@ button {
   object-position: center center;
   display: block;
   transition: opacity .12s ease;
-}
-
-.local-screen-preview-shell:fullscreen,
-.custom-focus-stage:fullscreen,
-.custom-stage:fullscreen {
-  width: 100vw !important;
-  height: 100vh !important;
-  min-width: 100vw !important;
-  min-height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  background: #000 !important;
-  display: grid !important;
-  place-items: center !important;
-  overflow: hidden !important;
-}
-
-.local-screen-preview-shell:fullscreen .local-screen-preview-media {
-  inset: 0;
-  background: #000;
-}
-
-.local-screen-preview-shell:fullscreen .local-screen-preview-media img,
-.custom-focus-stage:fullscreen .lk-participant-media-video,
-.custom-focus-stage:fullscreen .lk-participant-media-video[data-lk-source="screen_share"],
-.custom-stage:fullscreen .lk-participant-media-video,
-.custom-stage:fullscreen .lk-participant-media-video[data-lk-source="screen_share"] {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100vw !important;
-  max-height: 100vh !important;
-  object-fit: contain !important;
-  object-position: center center !important;
-}
-
-.custom-focus-stage:fullscreen .lk-participant-tile,
-.custom-stage:fullscreen .lk-participant-tile {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  background: #000 !important;
-}
-
-.local-screen-preview-shell:fullscreen .local-screen-preview-badge,
-.custom-focus-stage:fullscreen .lk-participant-metadata,
-.custom-stage:fullscreen .lk-participant-metadata {
-  display: none !important;
 }
 
 .local-screen-preview-placeholder {

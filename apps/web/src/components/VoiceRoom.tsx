@@ -19,19 +19,8 @@ type VoicePolicy = {
 type VoiceToken = { token: string; roomName: string; wsUrl: string; policy: VoicePolicy };
 type Settings = { pushToTalkEnabled?: boolean; pushToTalkKey?: string; startMuted?: boolean; cameraEnabledByDefault?: boolean; performanceMode?: boolean; lowPowerMode?: boolean; screenShareQuality?: 'LOW' | 'BALANCED' | 'HIGH' };
 
-function getScreenShareFullscreenTarget() {
-  const localPreview = document.querySelector('.local-screen-preview-shell') as HTMLElement | null;
-  if (localPreview) return localPreview;
-
-  const remoteScreenVideo = document.querySelector('.custom-focus-stage .lk-participant-media-video[data-lk-source="screen_share"]');
-  const remoteStage = remoteScreenVideo?.closest('.custom-focus-stage') as HTMLElement | null;
-  if (remoteStage) return remoteStage;
-
-  return document.querySelector('.custom-stage') as HTMLElement | null;
-}
-
-function requestScreenShareFullscreen() {
-  const target = getScreenShareFullscreenTarget();
+function requestVoiceLayoutFullscreen() {
+  const target = document.querySelector('.voice-layout') as HTMLElement | null;
   if (!target?.requestFullscreen || document.fullscreenElement) return;
   target.requestFullscreen().catch(() => null);
 }
@@ -142,9 +131,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
     const handleFullscreenChange = () => {
       const active = Boolean(document.fullscreenElement);
       setIsFullscreen(active);
-      if (!active) {
-        window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
-      }
+      window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active } }));
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
@@ -158,7 +145,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
       document.exitFullscreen().catch(() => null);
       return;
     }
-    requestScreenShareFullscreen();
+    requestVoiceLayoutFullscreen();
   };
 
   useEffect(() => {
