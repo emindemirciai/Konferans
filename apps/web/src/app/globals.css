@@ -1431,11 +1431,6 @@ button {
   transition: opacity .12s ease;
 }
 
-.local-screen-preview-media.is-sampling img,
-.local-screen-preview-media.is-sampling .local-screen-preview-placeholder {
-  opacity: 0;
-}
-
 .local-screen-preview-placeholder {
   display: grid;
   place-items: center;

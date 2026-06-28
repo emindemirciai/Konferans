@@ -277,7 +277,6 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const captureInFlightRef = useRef(false);
   const [snapshotUrl, setSnapshotUrl] = useState('');
-  const [isSampling, setIsSampling] = useState(false);
   const mediaStreamTrack = trackRef.publication.track?.mediaStreamTrack;
 
   const waitForPaint = useCallback(() => new Promise<void>((resolve) => {
@@ -318,7 +317,6 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
     if (!mediaStreamTrack || !video || !canvas || captureInFlightRef.current) return;
 
     captureInFlightRef.current = true;
-    setIsSampling(true);
     try {
       await waitForPaint();
       await waitForCaptureSurface();
@@ -344,7 +342,6 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
       // Some browsers can reject a frame while the screen track is settling.
     } finally {
       captureInFlightRef.current = false;
-      setIsSampling(false);
     }
   }, [mediaStreamTrack, waitForCaptureSurface, waitForPaint, waitForVideoFrame]);
 
@@ -367,7 +364,7 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
 
   return (
     <>
-      <div className={`local-screen-preview-media ${isSampling ? 'is-sampling' : ''}`}>
+      <div className="local-screen-preview-media">
         {snapshotUrl ? (
           <img src={snapshotUrl} alt="Yayın önizlemesi" />
         ) : (
