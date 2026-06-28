@@ -526,7 +526,7 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding-block: clamp(10px, 1.1vh, 16px);
+  padding-block: clamp(18px, 2vh, 28px);
 }
 
 .cinematic-mode .voice-chat-pane {
