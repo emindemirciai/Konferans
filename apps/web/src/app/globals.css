@@ -198,7 +198,6 @@ button {
   background: #07080d;
 }
 
-.fullscreen-mode .voice-layout,
 .cinematic-mode .voice-layout {
   position: fixed;
   inset: 0;
