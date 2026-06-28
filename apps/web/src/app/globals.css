@@ -526,7 +526,7 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding-block: 0;
+  padding-block: clamp(10px, 1.1vh, 16px);
 }
 
 .cinematic-mode .voice-chat-pane {
@@ -1589,7 +1589,7 @@ button {
 
 .cinematic-mode:not(.fullscreen-mode) .custom-focus-stage .lk-participant-media-video[data-lk-source="screen_share"],
 .cinematic-mode:not(.fullscreen-mode) .local-screen-preview-media img {
-  object-position: center bottom;
+  object-position: center center;
 }
 
 .local-screen-preview-placeholder {
