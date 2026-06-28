@@ -18,6 +18,34 @@ type VoicePolicy = {
 
 type VoiceToken = { token: string; roomName: string; wsUrl: string; policy: VoicePolicy };
 type Settings = { pushToTalkEnabled?: boolean; pushToTalkKey?: string; startMuted?: boolean; cameraEnabledByDefault?: boolean; performanceMode?: boolean; lowPowerMode?: boolean; screenShareQuality?: 'LOW' | 'BALANCED' | 'HIGH' };
+type FullscreenScreenLike = object;
+type FullscreenOptionsWithScreen = { navigationUI?: 'auto' | 'hide' | 'show'; screen?: FullscreenScreenLike };
+type ScreenDetailsLike = { currentScreen?: FullscreenScreenLike; screens?: FullscreenScreenLike[] };
+type WindowWithScreenDetails = Window & { getScreenDetails?: () => Promise<ScreenDetailsLike> };
+
+async function getPreferredFullscreenScreen() {
+  const getScreenDetails = (window as WindowWithScreenDetails).getScreenDetails;
+  if (!getScreenDetails) return undefined;
+  try {
+    const details = await getScreenDetails.call(window);
+    return details.currentScreen ?? details.screens?.[0];
+  } catch {
+    return undefined;
+  }
+}
+
+async function requestVoiceLayoutFullscreen() {
+  const target = document.querySelector('.voice-layout') as HTMLElement | null;
+  if (!target?.requestFullscreen || document.fullscreenElement) return;
+
+  const requestFullscreen = target.requestFullscreen as (options?: FullscreenOptionsWithScreen) => Promise<void>;
+  const screen = await getPreferredFullscreenScreen();
+  try {
+    await requestFullscreen.call(target, screen ? { navigationUI: 'hide', screen } : { navigationUI: 'hide' });
+  } catch {
+    await requestFullscreen.call(target).catch(() => null);
+  }
+}
 
 export function VoiceRoom({ token, channel }: { token: string; channel: { id: string; name: string; allowVideo?: boolean; allowScreenShare?: boolean; requirePushToTalk?: boolean; lowLatencyMode?: boolean } }) {
   const [voice, setVoice] = useState<VoiceToken | null>(null);
@@ -136,11 +164,17 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
 
   const toggleFullscreen = () => {
     const nextState = !isFullscreen;
-    if (!nextState && document.fullscreenElement) {
-      document.exitFullscreen().catch(() => null);
+    if (!nextState) {
+      setIsFullscreen(false);
+      window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => null);
+      }
+      return;
     }
-    setIsFullscreen(nextState);
-    window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: nextState } }));
+    flushSync(() => setIsFullscreen(true));
+    window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: true } }));
+    void requestVoiceLayoutFullscreen();
   };
 
   useEffect(() => {
