@@ -26,7 +26,7 @@ services:
     volumes:
       - redis_data:/data
 
-livekit:
+  livekit:
     image: livekit/livekit-server:latest
     restart: unless-stopped
     command: --node-ip=72.62.53.122
