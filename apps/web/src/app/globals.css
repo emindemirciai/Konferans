@@ -198,6 +198,7 @@ button {
   background: #07080d;
 }
 
+.fullscreen-mode .voice-layout,
 .cinematic-mode .voice-layout {
   position: fixed;
   inset: 0;
@@ -212,7 +213,7 @@ button {
 }
 
 .voice-layout:fullscreen .voice-chat-pane {
-  display: none;
+  display: flex;
 }
 
 .voice-room-pane {
@@ -452,7 +453,9 @@ button {
 }
 
 .fullscreen-mode .voice-chat-pane {
-  display: none;
+  width: clamp(300px, 24vw, 360px);
+  max-width: 34vw;
+  display: flex;
 }
 
 .cinematic-mode .voice-chat-pane {

@@ -101,8 +101,10 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
     setConnected(false);
     setError('');
     setIsCinematic(false);
+    setIsFullscreen(false);
     setIsLocalScreenSharing(false);
     window.dispatchEvent(new CustomEvent('konferans:cinematic-mode', { detail: { active: false } }));
+    window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
 
     void connectVoice();
     
@@ -121,12 +123,11 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const active = Boolean(document.fullscreenElement);
-      setIsFullscreen(active);
-      window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active } }));
+      if (document.fullscreenElement) return;
+      setIsFullscreen(false);
+      window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    handleFullscreenChange();
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
@@ -134,13 +135,24 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
   }, []);
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      const target = document.querySelector('.voice-layout') as HTMLElement | null;
-      (target ?? document.documentElement).requestFullscreen().catch(() => null);
-    } else {
+    const nextState = !isFullscreen;
+    if (!nextState && document.fullscreenElement) {
       document.exitFullscreen().catch(() => null);
     }
+    setIsFullscreen(nextState);
+    window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: nextState } }));
   };
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIsFullscreen(false);
+      window.dispatchEvent(new CustomEvent('konferans:fullscreen-mode', { detail: { active: false } }));
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFullscreen]);
 
   const toggleCinematic = () => {
     const nextState = !isCinematic;
