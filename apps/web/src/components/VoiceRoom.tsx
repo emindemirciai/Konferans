@@ -125,7 +125,7 @@ export function VoiceRoom({
         setVoice(null);
       }}
       data-lk-theme="default"
-      className={voice ${settings.performanceMode ? 'voice-performance' : ''}}
+      className={'voice ' + (settings.performanceMode ? 'voice-performance' : '')}
     >
       <RoomAudioRenderer />
       <StartAudio label="Sesi başlat" />
