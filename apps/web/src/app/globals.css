@@ -526,8 +526,17 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding-block: clamp(14px, 2.2vh, 30px);
+  padding-block: clamp(8px, 1.35vh, 20px);
+  padding-inline: 0;
+  align-items: stretch;
+  justify-content: stretch;
   background: #05070b;
+}
+
+.cinematic-mode:not(.fullscreen-mode) .local-screen-share-stage-preview,
+.cinematic-mode:not(.fullscreen-mode) .local-screen-preview-shell {
+  width: 100%;
+  max-width: 100%;
 }
 
 .cinematic-mode .voice-chat-pane {
