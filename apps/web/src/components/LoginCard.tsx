@@ -12,15 +12,23 @@ declare global {
 type Mode = 'login' | 'register' | 'verify';
 
 export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: string }) {
-  const [mode, setMode] = useState<Mode>(defaultInviteCode ? 'register' : 'login');
+  const normalizedInviteCode = defaultInviteCode.trim();
+  const [mode, setMode] = useState<Mode>(normalizedInviteCode ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [inviteCode, setInviteCode] = useState(defaultInviteCode);
+  const [inviteCode, setInviteCode] = useState(normalizedInviteCode);
   const [verifyCode, setVerifyCode] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [googleClientId, setGoogleClientId] = useState('');
+  const [googleButtonReady, setGoogleButtonReady] = useState(false);
+
+  useEffect(() => {
+    if (!normalizedInviteCode) return;
+    setInviteCode(normalizedInviteCode);
+    setMode('register');
+  }, [normalizedInviteCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,11 +37,13 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
       setGoogleClientId(publicClientId);
       return;
     }
+
     api<{ googleClientId?: string }>('/config')
       .then((config) => {
         if (!cancelled && config.googleClientId) setGoogleClientId(config.googleClientId);
       })
       .catch(() => null);
+
     return () => {
       cancelled = true;
     };
@@ -41,16 +51,20 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
 
   useEffect(() => {
     if (!googleClientId) return;
+
     let cancelled = false;
+
     const renderGoogleButton = () => {
-      if (cancelled) return;
+      if (cancelled || !window.google?.accounts?.id) return;
       const buttonTarget = document.getElementById('google-button');
       if (!buttonTarget) return;
+
       buttonTarget.innerHTML = '';
-      window.google?.accounts.id.initialize({
+      window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: async (response: any) => {
           try {
+            setError('');
             const data = await api<{ token: string }>('/auth/google', {
               method: 'POST',
               body: JSON.stringify({ credential: response.credential, inviteCode: inviteCode || undefined }),
@@ -62,7 +76,14 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
           }
         },
       });
-      window.google?.accounts.id.renderButton(buttonTarget, { theme: 'filled_black', size: 'large', width: Math.min(360, buttonTarget.clientWidth || 360) });
+      window.google.accounts.id.renderButton(buttonTarget, {
+        theme: 'filled_black',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        width: Math.min(360, buttonTarget.clientWidth || 360),
+      });
+      setGoogleButtonReady(true);
     };
 
     if (window.google?.accounts?.id) {
@@ -75,6 +96,7 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
     const existingScript = document.getElementById('google-identity-script') as HTMLScriptElement | null;
     if (existingScript) {
       existingScript.addEventListener('load', renderGoogleButton, { once: true });
+      existingScript.addEventListener('error', () => setGoogleButtonReady(false), { once: true });
       return () => {
         cancelled = true;
         existingScript.removeEventListener('load', renderGoogleButton);
@@ -87,10 +109,15 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
     script.async = true;
     script.defer = true;
     script.onload = renderGoogleButton;
+    script.onerror = () => {
+      if (!cancelled) setGoogleButtonReady(false);
+    };
     document.body.appendChild(script);
+
     return () => {
       cancelled = true;
       script.onload = null;
+      script.onerror = null;
     };
   }, [googleClientId, inviteCode]);
 
@@ -116,6 +143,26 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
     }
   }
 
+  function handleGoogleFallback() {
+    setError('');
+    if (!googleClientId) {
+      setError('Google girişi için istemci kimliği bulunamadı. Sunucu ayarlarını kontrol et.');
+      return;
+    }
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt();
+      setMessage('Google hesabını seçebilirsin.');
+      return;
+    }
+    setMessage('Google girişi yükleniyor. Birkaç saniye sonra tekrar dene.');
+  }
+
+  function toggleMode() {
+    setError('');
+    setMessage('');
+    setMode(mode === 'login' ? 'register' : 'login');
+  }
+
   return (
     <div className="login-card">
       <h1>Konferans</h1>
@@ -124,29 +171,29 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
       {mode !== 'login' && (
         <div className="field">
           <label>Davet kodu</label>
-          <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="KF-..." />
+          <input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder="KF-..." />
         </div>
       )}
       {mode === 'register' && (
         <div className="field">
           <label>Ad</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Adın" />
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Adın" />
         </div>
       )}
       <div className="field">
         <label>E-posta</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="mail@example.com" />
+        <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="mail@example.com" />
       </div>
       {mode !== 'verify' && (
         <div className="field">
           <label>Şifre</label>
-          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="En az 8 karakter" />
+          <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="En az 8 karakter" />
         </div>
       )}
       {mode === 'verify' && (
         <div className="field">
           <label>Doğrulama kodu</label>
-          <input value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} placeholder="6 haneli kod" />
+          <input value={verifyCode} onChange={(event) => setVerifyCode(event.target.value)} placeholder="6 haneli kod" />
         </div>
       )}
 
@@ -156,9 +203,16 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
         {mode === 'login' ? 'Giriş yap' : mode === 'register' ? 'Kayıt ol' : 'Doğrula'}
       </button>
 
-      <div style={{ display: 'grid', placeItems: 'center', marginTop: 14 }} id="google-button" />
+      <div className="google-login-block">
+        <div id="google-button" className={`google-button-slot ${googleButtonReady ? '' : 'is-hidden'}`} />
+        {!googleButtonReady && (
+          <button className="secondary google-fallback-button" type="button" onClick={handleGoogleFallback}>
+            Google ile bağlan
+          </button>
+        )}
+      </div>
 
-      <button className="secondary" style={{ width: '100%', marginTop: 14 }} onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+      <button className="secondary" style={{ width: '100%', marginTop: 14 }} onClick={toggleMode}>
         {mode === 'login' ? 'Davet kodum var, kayıt olmak istiyorum' : 'Giriş ekranına dön'}
       </button>
     </div>

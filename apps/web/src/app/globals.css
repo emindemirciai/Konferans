@@ -526,7 +526,8 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding-block: clamp(18px, 2vh, 28px);
+  padding-block: clamp(34px, 4.8vh, 64px);
+  background: #05070b;
 }
 
 .cinematic-mode .voice-chat-pane {
@@ -581,6 +582,41 @@ button {
 .login-card p {
   margin: 0 0 18px;
   color: var(--muted);
+}
+
+.invite-code-note {
+  color: var(--muted);
+  text-align: center;
+}
+
+.google-login-block {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  margin-top: 14px;
+}
+
+.google-button-slot {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.google-button-slot.is-hidden {
+  min-height: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.google-fallback-button {
+  width: 100%;
+  min-height: 44px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, .12);
 }
 
 .field {
