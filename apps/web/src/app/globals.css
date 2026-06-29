@@ -85,33 +85,38 @@ button {
 }
 
 .channel-header {
-  padding: 18px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--line);
+  font-size: 16px;
+  line-height: 22px;
   font-weight: 800;
 }
 
 .channel-section {
-  padding: 14px;
+  padding: 12px 14px;
 }
 
 .section-title {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
-  margin: 16px 0 8px;
+  margin: 14px 0 8px;
 }
 
 .channel {
   width: 100%;
   border-radius: 10px;
-  padding: 10px 12px;
+  min-height: 38px;
+  padding: 9px 12px;
   display: flex;
   gap: 8px;
   align-items: center;
   color: var(--muted);
   background: transparent;
+  font-size: 15px;
+  line-height: 20px;
   text-align: left;
 }
 
@@ -126,9 +131,11 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 4px;
+  min-height: 28px;
+  padding: 5px 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 18px;
   color: var(--muted);
   user-select: none;
   background: rgba(0, 0, 0, 0.01);
@@ -526,7 +533,7 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding: clamp(12px, 1.6vh, 24px);
+  padding: clamp(12px, 1.6vh, 24px) 0;
   align-items: stretch;
   justify-content: stretch;
   background: #05070b;
@@ -739,18 +746,19 @@ button {
 }
 
 .voice-connection-card {
-  margin: 10px 14px 12px;
-  padding: 10px;
+  margin: 10px 12px 12px;
+  padding: 10px 11px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, .04);
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 
 .voice-connection-card span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 14px;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -760,10 +768,13 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 15px;
+  line-height: 20px;
 }
 
 .voice-leave-button {
   border-radius: 9px;
+  min-height: 38px;
   padding: 8px 10px;
   color: #fff;
   background: rgba(255, 92, 122, .32);
@@ -771,6 +782,13 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.voice-leave-button svg {
+  width: 15px;
+  height: 15px;
 }
 
 .voice-leave-button:hover {
