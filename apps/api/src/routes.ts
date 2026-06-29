@@ -199,41 +199,113 @@ router.post('/auth/login', async (req, res) => {
 
 router.post('/auth/google', async (req, res) => {
   try {
-    const schema = z.object({ credential: z.string(), inviteCode: z.string().optional() });
+    const schema = z.object({
+      credential: z.string(),
+      inviteCode: z.string().optional(),
+    });
+
     const { credential, inviteCode } = schema.parse(req.body);
-    if (!env.GOOGLE_CLIENT_ID) throw new Error('Google Client ID yapılandırılmamış.');
 
-    const ticket = await google.verifyIdToken({ idToken: credential, audience: env.GOOGLE_CLIENT_ID });
+    if (!env.GOOGLE_CLIENT_ID) {
+      throw new Error('Google Client ID yapılandırılmamış.');
+    }
+
+    const ticket = await google.verifyIdToken({
+      idToken: credential,
+      audience: env.GOOGLE_CLIENT_ID,
+    });
+
     const payload = ticket.getPayload();
-    if (!payload?.email || !payload.sub) throw new Error('Google hesabı doğrulanamadı.');
 
-    const existingUser = await prisma.user.findUnique({ where: { email: payload.email.toLowerCase() } });
+    if (!payload?.email || !payload.sub) {
+      throw new Error('Google hesabı doğrulanamadı.');
+    }
+
+    const email = payload.email.toLowerCase();
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
     const inviteRequired = !existingUser && isInviteOnly && !allowPublicRegistration;
     const invite = await validateInvite(inviteCode, inviteRequired, !existingUser);
 
-    const user = await prisma.user.upsert({
-      where: { email: payload.email.toLowerCase() },
-      create: {
-        email: payload.email.toLowerCase(),
-        name: payload.name || payload.email.split('@')[0],
-        avatarUrl: payload.picture,
-        googleSub: payload.sub,
-        provider: 'GOOGLE',
-        emailVerified: true,
+    let user = existingUser;
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: payload.name || email.split('@')[0],
+          avatarUrl: payload.picture,
+          googleSub: payload.sub,
+          provider: 'GOOGLE',
+          emailVerified: false,
+          settings: { create: {} },
+        },
+      });
+
+      await attachInvitedServer(user.id, invite?.serverId);
+
+      if (!invite?.serverId) {
+        await autoCreateUserServer(user.id, user.name);
+      }
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleSub: payload.sub,
+          avatarUrl: payload.picture,
+        },
+      });
+
+      await attachInvitedServer(user.id, invite?.serverId);
+    }
+
+    if (!user.emailVerified) {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+
+      await prisma.verificationCode.create({
+        data: {
+          userId: user.id,
+          code,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+
+      await sendVerificationEmail(user.email, code);
+
+      return res.json({
+        requiresEmailVerification: true,
+        email: user.email,
+        message: 'Google hesabın alındı. E-posta doğrulama kodunu gir.',
+        user: publicUser(user),
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
         presenceStatus: 'ONLINE',
         lastSeenAt: new Date(),
-        settings: { create: {} },
       },
-      update: { googleSub: payload.sub, avatarUrl: payload.picture, emailVerified: true, presenceStatus: 'ONLINE', lastSeenAt: new Date() },
     });
 
-    await attachInvitedServer(user.id, invite?.serverId);
-    if (!existingUser && !invite?.serverId) await autoCreateUserServer(user.id, user.name);
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      globalRole: user.globalRole,
+    });
 
-    const token = signToken({ id: user.id, email: user.email, name: user.name, globalRole: user.globalRole });
-    res.json({ token, user: publicUser(user) });
+    res.json({
+      token,
+      user: publicUser(user),
+    });
   } catch (error: any) {
-    res.status(400).json({ message: error.message || 'Google girişi başarısız.' });
+    res.status(400).json({
+      message: error.message || 'Google girişi başarısız.',
+    });
   }
 });
 
