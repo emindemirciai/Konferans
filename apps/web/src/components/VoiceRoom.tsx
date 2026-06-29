@@ -284,7 +284,7 @@ function LocalScreenShareStage({ trackRef }: { trackRef: TrackReference }) {
   return (
     <div className="local-screen-share-stage local-screen-share-stage-preview">
       <div className="local-screen-preview-shell">
-        <LocalScreenShareSnapshot trackRef={trackRef} />
+        <LiveLocalScreenSharePreview trackRef={trackRef} />
       </div>
     </div>
   );
@@ -293,98 +293,65 @@ function LocalScreenShareStage({ trackRef }: { trackRef: TrackReference }) {
 function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const captureInFlightRef = useRef(false);
-  const [snapshotUrl, setSnapshotUrl] = useState('');
+  const [previewReady, setPreviewReady] = useState(false);
+  const snapshotUrl = '';
   const mediaStreamTrack = trackRef.publication.track?.mediaStreamTrack;
-
-  const waitForPaint = useCallback(() => new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve());
-    });
-  }), []);
-
-  const waitForCaptureSurface = useCallback(() => new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 120);
-  }), []);
-
-  const waitForVideoFrame = useCallback((video: HTMLVideoElement) => new Promise<void>((resolve) => {
-    let settled = false;
-    const timeout = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    }, 700);
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      resolve();
-    };
-
-    if ('requestVideoFrameCallback' in video) {
-      const frameVideo = video as HTMLVideoElement & { requestVideoFrameCallback: (callback: () => void) => number };
-      frameVideo.requestVideoFrameCallback(done);
-      return;
-    }
-    window.requestAnimationFrame(done);
-  }), []);
-
-  const captureSnapshot = useCallback(async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!mediaStreamTrack || !video || !canvas || captureInFlightRef.current) return;
-
-    captureInFlightRef.current = true;
-    try {
-      await waitForPaint();
-      await waitForCaptureSurface();
-      if (!(video.srcObject instanceof MediaStream)) {
-        video.srcObject = new MediaStream([mediaStreamTrack]);
-      }
-      await video.play().catch(() => null);
-      await waitForVideoFrame(video);
-
-      const sourceSettings = mediaStreamTrack.getSettings();
-      const sourceWidth = video.videoWidth || sourceSettings.width || 1280;
-      const sourceHeight = video.videoHeight || sourceSettings.height || 720;
-      const viewportScale = window.devicePixelRatio || 1;
-      const maxSnapshotWidth = Math.min(3840, Math.max(1920, Math.round(window.innerWidth * viewportScale)));
-      const maxSnapshotHeight = Math.min(2160, Math.max(1080, Math.round(window.innerHeight * viewportScale)));
-      const scale = Math.min(1, maxSnapshotWidth / sourceWidth, maxSnapshotHeight / sourceHeight);
-      const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
-      const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
-      const context = canvas.getContext('2d');
-      if (!context) return;
-
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(video, 0, 0, targetWidth, targetHeight);
-      setSnapshotUrl(canvas.toDataURL('image/webp', 0.82));
-    } catch {
-      // Some browsers can reject a frame while the screen track is settling.
-    } finally {
-      captureInFlightRef.current = false;
-    }
-  }, [mediaStreamTrack, waitForCaptureSurface, waitForPaint, waitForVideoFrame]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!mediaStreamTrack || !video) return;
+    const canvas = canvasRef.current;
+    if (!mediaStreamTrack || !video || !canvas) return;
 
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    let stopped = false;
+    let frameId = 0;
+    let hasFrame = false;
+
+    const drawPreviewFrame = () => {
+      if (stopped) return;
+
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
+        const sourceSettings = mediaStreamTrack.getSettings();
+        const sourceWidth = video.videoWidth || sourceSettings.width || 1280;
+        const sourceHeight = video.videoHeight || sourceSettings.height || 720;
+        const viewportScale = window.devicePixelRatio || 1;
+        const maxPreviewWidth = Math.min(1920, Math.max(1280, Math.round(window.innerWidth * viewportScale)));
+        const maxPreviewHeight = Math.min(1080, Math.max(720, Math.round(window.innerHeight * viewportScale)));
+        const scale = Math.min(1, maxPreviewWidth / sourceWidth, maxPreviewHeight / sourceHeight);
+        const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+        const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+        }
+
+        context.drawImage(video, 0, 0, targetWidth, targetHeight);
+        if (!hasFrame) {
+          hasFrame = true;
+          setPreviewReady(true);
+        }
+      }
+
+      frameId = window.requestAnimationFrame(drawPreviewFrame);
+    };
+
+    setPreviewReady(false);
     video.srcObject = new MediaStream([mediaStreamTrack]);
-    void captureSnapshot();
-    const timer = window.setInterval(() => {
-      void captureSnapshot();
-    }, 5000);
+    void video.play().catch(() => null);
+    frameId = window.requestAnimationFrame(drawPreviewFrame);
 
     return () => {
-      window.clearInterval(timer);
+      stopped = true;
+      window.cancelAnimationFrame(frameId);
       video.pause();
       video.srcObject = null;
     };
-  }, [captureSnapshot, mediaStreamTrack]);
+  }, [mediaStreamTrack]);
 
   return (
     <>
@@ -401,6 +368,85 @@ function LocalScreenShareSnapshot({ trackRef }: { trackRef: TrackReference }) {
       <span className="local-screen-preview-badge">Canlı</span>
       <video ref={videoRef} className="local-screen-preview-video" muted playsInline />
       <canvas ref={canvasRef} className="local-screen-preview-canvas" />
+    </>
+  );
+}
+
+function LiveLocalScreenSharePreview({ trackRef }: { trackRef: TrackReference }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [previewReady, setPreviewReady] = useState(false);
+  const mediaStreamTrack = trackRef.publication.track?.mediaStreamTrack;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!mediaStreamTrack || !video || !canvas) return;
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    let stopped = false;
+    let frameId = 0;
+    let hasFrame = false;
+
+    const drawPreviewFrame = () => {
+      if (stopped) return;
+
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
+        const sourceSettings = mediaStreamTrack.getSettings();
+        const sourceWidth = video.videoWidth || sourceSettings.width || 1280;
+        const sourceHeight = video.videoHeight || sourceSettings.height || 720;
+        const viewportScale = window.devicePixelRatio || 1;
+        const maxPreviewWidth = Math.min(1920, Math.max(1280, Math.round(window.innerWidth * viewportScale)));
+        const maxPreviewHeight = Math.min(1080, Math.max(720, Math.round(window.innerHeight * viewportScale)));
+        const scale = Math.min(1, maxPreviewWidth / sourceWidth, maxPreviewHeight / sourceHeight);
+        const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+        const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+        }
+
+        context.drawImage(video, 0, 0, targetWidth, targetHeight);
+        if (!hasFrame) {
+          hasFrame = true;
+          setPreviewReady(true);
+        }
+      }
+
+      frameId = window.requestAnimationFrame(drawPreviewFrame);
+    };
+
+    setPreviewReady(false);
+    video.srcObject = new MediaStream([mediaStreamTrack]);
+    void video.play().catch(() => null);
+    frameId = window.requestAnimationFrame(drawPreviewFrame);
+
+    return () => {
+      stopped = true;
+      window.cancelAnimationFrame(frameId);
+      video.pause();
+      video.srcObject = null;
+    };
+  }, [mediaStreamTrack]);
+
+  return (
+    <>
+      <div className="local-screen-preview-media">
+        <canvas ref={canvasRef} className={`local-screen-preview-canvas ${previewReady ? 'ready' : ''}`} aria-label="Yayın önizlemesi" />
+        {!previewReady && (
+          <div className="local-screen-preview-placeholder">
+            <MonitorPlay size={30} />
+            <span>Önizleme hazırlanıyor</span>
+          </div>
+        )}
+      </div>
+      <span className="local-screen-preview-badge">Canlı</span>
+      <video ref={videoRef} className="local-screen-preview-video" muted playsInline />
     </>
   );
 }

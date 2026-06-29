@@ -20,17 +20,35 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
   const [verifyCode, setVerifyCode] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [googleClientId, setGoogleClientId] = useState('');
 
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
+    let cancelled = false;
+    const publicClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (publicClientId) {
+      setGoogleClientId(publicClientId);
+      return;
+    }
+    api<{ googleClientId?: string }>('/config')
+      .then((config) => {
+        if (!cancelled && config.googleClientId) setGoogleClientId(config.googleClientId);
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId) return;
+    let cancelled = false;
+    const renderGoogleButton = () => {
+      if (cancelled) return;
+      const buttonTarget = document.getElementById('google-button');
+      if (!buttonTarget) return;
+      buttonTarget.innerHTML = '';
       window.google?.accounts.id.initialize({
-        client_id: clientId,
+        client_id: googleClientId,
         callback: async (response: any) => {
           try {
             const data = await api<{ token: string }>('/auth/google', {
@@ -44,11 +62,37 @@ export function LoginCard({ defaultInviteCode = '' }: { defaultInviteCode?: stri
           }
         },
       });
-      window.google?.accounts.id.renderButton(document.getElementById('google-button'), { theme: 'filled_black', size: 'large', width: 360 });
+      window.google?.accounts.id.renderButton(buttonTarget, { theme: 'filled_black', size: 'large', width: Math.min(360, buttonTarget.clientWidth || 360) });
     };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.getElementById('google-identity-script') as HTMLScriptElement | null;
+    if (existingScript) {
+      existingScript.addEventListener('load', renderGoogleButton, { once: true });
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener('load', renderGoogleButton);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-identity-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
     document.body.appendChild(script);
-    return () => { script.remove(); };
-  }, [inviteCode]);
+    return () => {
+      cancelled = true;
+      script.onload = null;
+    };
+  }, [googleClientId, inviteCode]);
 
   async function submit() {
     setError('');

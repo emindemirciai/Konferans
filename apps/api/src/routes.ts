@@ -757,6 +757,7 @@ router.get('/config', (_req, res) => {
     inviteOnly: isInviteOnly,
     allowPublicRegistration,
     googleEnabled: Boolean(env.GOOGLE_CLIENT_ID),
+    googleClientId: env.GOOGLE_CLIENT_ID,
     livekitWsUrl: env.LIVEKIT_PUBLIC_WS_URL,
     webUrl: env.PUBLIC_WEB_URL,
   });

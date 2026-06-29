@@ -555,9 +555,12 @@ button {
 
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   display: grid;
   place-items: center;
   padding: 20px;
+  overflow-y: auto;
   background: radial-gradient(circle at 50% 0%, rgba(124, 92, 255, .25), transparent 35%), var(--bg);
 }
 
@@ -612,11 +615,12 @@ button {
 
 @media (max-width: 980px) {
   .app {
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: 64px minmax(196px, 232px) minmax(0, 1fr);
   }
 
   .channelbar {
-    display: none;
+    display: flex;
+    min-width: 0;
   }
 
   .members {
@@ -1156,23 +1160,74 @@ button {
 @media (max-width: 720px) {
   .app {
     grid-template-columns: 1fr;
+    grid-template-rows: 64px minmax(152px, 34dvh) minmax(0, 1fr);
+    height: 100dvh;
+    min-height: 100dvh;
   }
 
   .serverbar {
+    min-height: 64px;
+    height: 64px;
     flex-direction: row;
     position: sticky;
     top: 0;
     z-index: 5;
     overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 10px;
   }
 
   .channelbar {
-    display: block;
-    min-height: auto;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .main {
-    min-height: 70vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .voice-main .content,
+  .voice-main .voice-layout,
+  .voice-main .voice,
+  .voice-main .chat {
+    height: 100%;
+  }
+
+  .voice-layout {
+    flex-direction: column;
+  }
+
+  .voice-chat-pane {
+    width: 100%;
+    max-width: none;
+    height: min(34dvh, 260px);
+    border-left: 0;
+    border-top: 1px solid #3f4147;
+  }
+
+  .chat {
+    height: 100%;
+  }
+
+  .composer {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .composer textarea {
+    min-height: 46px;
+    padding: 12px 13px;
+  }
+
+  .composer button {
+    min-height: 46px;
+    min-width: 48px;
   }
 
   .policy-grid,
@@ -1578,7 +1633,8 @@ button {
     #070910;
 }
 
-.local-screen-preview-media img {
+.local-screen-preview-media img,
+.local-screen-preview-canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -1588,11 +1644,22 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-focus-stage .lk-participant-media-video[data-lk-source="screen_share"],
-.cinematic-mode:not(.fullscreen-mode) .local-screen-preview-media img {
+.cinematic-mode:not(.fullscreen-mode) .local-screen-preview-media img,
+.cinematic-mode:not(.fullscreen-mode) .local-screen-preview-canvas {
   object-position: center center;
 }
 
+.local-screen-preview-canvas {
+  opacity: 0;
+}
+
+.local-screen-preview-canvas.ready {
+  opacity: 1;
+}
+
 .local-screen-preview-placeholder {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   gap: 8px;
@@ -1638,8 +1705,7 @@ button {
   font-size: 15px;
 }
 
-.local-screen-preview-video,
-.local-screen-preview-canvas {
+.local-screen-preview-video {
   position: fixed;
   left: -10000px;
   top: -10000px;
