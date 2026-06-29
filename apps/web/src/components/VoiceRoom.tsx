@@ -394,15 +394,14 @@ function LiveLocalScreenSharePreview({ trackRef }: { trackRef: TrackReference })
       if (stopped) return;
 
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
-        const sourceSettings = mediaStreamTrack.getSettings();
-        const sourceWidth = video.videoWidth || sourceSettings.width || 1280;
-        const sourceHeight = video.videoHeight || sourceSettings.height || 720;
-        const viewportScale = window.devicePixelRatio || 1;
-        const maxPreviewWidth = Math.min(1920, Math.max(1280, Math.round(window.innerWidth * viewportScale)));
-        const maxPreviewHeight = Math.min(1080, Math.max(720, Math.round(window.innerHeight * viewportScale)));
-        const scale = Math.min(1, maxPreviewWidth / sourceWidth, maxPreviewHeight / sourceHeight);
-        const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
-        const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+        const previewBounds = canvas.parentElement?.getBoundingClientRect();
+        const cssWidth = Math.max(1, Math.floor(previewBounds?.width || canvas.clientWidth || window.innerWidth));
+        const cssHeight = Math.max(1, Math.floor(previewBounds?.height || canvas.clientHeight || window.innerHeight));
+        const bitmapScale = Math.max(.5, Math.min(window.devicePixelRatio || 1, 1920 / cssWidth, 1080 / cssHeight));
+        const targetWidth = Math.max(1, Math.round(cssWidth * bitmapScale));
+        const targetHeight = Math.max(1, Math.round(cssHeight * bitmapScale));
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
 
         if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
           canvas.width = targetWidth;
@@ -411,7 +410,16 @@ function LiveLocalScreenSharePreview({ trackRef }: { trackRef: TrackReference })
           context.imageSmoothingQuality = 'high';
         }
 
-        context.drawImage(video, 0, 0, targetWidth, targetHeight);
+        context.fillStyle = '#05070b';
+        context.fillRect(0, 0, targetWidth, targetHeight);
+
+        const containScale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+        const drawWidth = Math.round(sourceWidth * containScale);
+        const drawHeight = Math.round(sourceHeight * containScale);
+        const drawX = Math.round((targetWidth - drawWidth) / 2);
+        const drawY = Math.round((targetHeight - drawHeight) / 2);
+        context.drawImage(video, 0, 0, sourceWidth, sourceHeight, drawX, drawY, drawWidth, drawHeight);
+
         if (!hasFrame) {
           hasFrame = true;
           setPreviewReady(true);
