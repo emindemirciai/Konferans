@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ControlBar, GridLayout, isTrackReference, LiveKitRoom, ParticipantTile, RoomAudioRenderer, StartAudio, useLocalParticipant, useRemoteParticipants, useTracks, type TrackReference } from '@livekit/components-react';
 import { Track } from 'livekit-client';
@@ -165,14 +165,6 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
     window.dispatchEvent(new CustomEvent('konferans:cinematic-mode', { detail: { active: nextState } }));
   };
 
-  const handleVoiceStageClick = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    if (!target?.closest('.lk-disconnect-button')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    leaveChannel();
-  }, [leaveChannel]);
-
   if (!connected || !voice) {
     return (
       <div className="voice" style={{ display: 'grid', placeItems: 'center' }}>
@@ -228,8 +220,8 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
               </button>
             </div>
           </div>
-          <div className="voice-stage" onClickCapture={handleVoiceStageClick}>
-            <VoiceConference />
+          <div className="voice-stage">
+            <VoiceConference onLeaveChannel={leaveChannel} />
           </div>
           <GameVoiceControls channelId={channel.id} settings={settings} policy={voice.policy} />
         </>
@@ -238,7 +230,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
   );
 }
 
-function VoiceConference() {
+function VoiceConference({ onLeaveChannel }: { onLeaveChannel: () => void }) {
   const tracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: true },
     { source: Track.Source.ScreenShare, withPlaceholder: false },
@@ -272,9 +264,13 @@ function VoiceConference() {
         )}
       </div>
       <div className="custom-control-row">
-        <ControlBar controls={{ microphone: true, camera: true, screenShare: false, chat: false, settings: false, leave: true }} />
+        <ControlBar controls={{ microphone: true, camera: true, screenShare: false, chat: false, settings: false, leave: false }} />
         <ScreenSelectionControl visible={!localScreenShare} isSharing={false} surface="control" />
         <StopScreenShareControl visible={Boolean(localScreenShare)} />
+        <button className="lk-button manual-screen-share-button voice-control-leave-button" title="Kanaldan ayrıl" onClick={onLeaveChannel}>
+          <PhoneOff size={18} />
+          <span>Kanaldan ayrıl</span>
+        </button>
       </div>
     </div>
   );

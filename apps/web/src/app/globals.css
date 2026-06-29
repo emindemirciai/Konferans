@@ -526,8 +526,7 @@ button {
 }
 
 .cinematic-mode:not(.fullscreen-mode) .custom-stage {
-  padding-block: clamp(12px, 1.8vh, 26px);
-  padding-inline: clamp(12px, 1.1vw, 22px);
+  padding: clamp(12px, 1.6vh, 24px);
   align-items: stretch;
   justify-content: stretch;
   background: #05070b;
@@ -1815,6 +1814,17 @@ button {
 
 .screen-stop-button:hover {
   background: rgba(31, 145, 255, 1) !important;
+}
+
+.voice-control-leave-button {
+  order: 5;
+  background: rgba(255, 92, 122, .22) !important;
+  border: 1px solid rgba(255, 92, 122, .45) !important;
+  color: #fff !important;
+}
+
+.voice-control-leave-button:hover {
+  background: rgba(255, 92, 122, .35) !important;
 }
 
 .voice .lk-control-bar {
