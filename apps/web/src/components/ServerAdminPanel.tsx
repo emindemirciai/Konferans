@@ -8,7 +8,7 @@ type Member = { id: string; role: string; serverMuted?: boolean; serverDeafened?
 type Channel = { id: string; name: string; type: 'TEXT' | 'VOICE'; allowVideo?: boolean; allowScreenShare?: boolean; requirePushToTalk?: boolean; lowLatencyMode?: boolean; isLocked?: boolean };
 type Server = { id: string; name: string; channels: Channel[]; members: Member[]; widget?: any };
 
-export function ServerAdminPanel({ token, server, role, onChanged }: { token: string; server: Server; role: string; onChanged: () => void }) {
+export function ServerAdminPanel({ token, server, role, onChanged, onDeleted }: { token: string; server: Server; role: string; onChanged: () => void; onDeleted?: (serverId: string) => void | Promise<void> }) {
   const [invite, setInvite] = useState('');
   const [widgetCode, setWidgetCode] = useState('');
   const canAdmin = role === 'OWNER' || role === 'ADMIN';
@@ -49,7 +49,7 @@ export function ServerAdminPanel({ token, server, role, onChanged }: { token: st
   async function deleteServer() {
     if (!confirm(`'${server.name}' sunucusunu tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz!`)) return;
     await api(`/servers/${server.id}`, { token, method: 'DELETE' });
-    window.location.href = '/';
+    await onDeleted?.(server.id);
   }
 
   function logout() {

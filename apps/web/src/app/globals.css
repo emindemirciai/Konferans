@@ -1222,14 +1222,18 @@ button {
 @media (max-width: 720px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 64px minmax(152px, 34dvh) minmax(0, 1fr);
+    grid-template-rows: 58px minmax(112px, 24dvh) minmax(0, 1fr);
     height: 100dvh;
     min-height: 100dvh;
   }
 
+  .app.voice-panel-active {
+    grid-template-rows: 58px minmax(92px, 18dvh) minmax(0, 1fr);
+  }
+
   .serverbar {
-    min-height: 64px;
-    height: 64px;
+    min-height: 58px;
+    height: 58px;
     flex-direction: row;
     position: sticky;
     top: 0;
@@ -1238,7 +1242,48 @@ button {
     overflow-y: hidden;
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    padding: 8px 10px;
+    padding: 7px 8px;
+    gap: 8px;
+    scrollbar-width: none;
+  }
+
+  .serverbar::-webkit-scrollbar,
+  .serverbar-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .serverbar-divider {
+    width: 1px !important;
+    height: 34px !important;
+    margin: 4px 0 !important;
+  }
+
+  .serverbar-list {
+    min-width: 0;
+    width: auto !important;
+    flex: 1 1 auto !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .serverbar-actions {
+    width: auto !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    flex: 0 0 auto !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+  }
+
+  .server-pill {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 15px;
+    font-size: 14px;
   }
 
   .channelbar {
@@ -1249,9 +1294,49 @@ button {
     border-bottom: 1px solid var(--line);
   }
 
+  .channel-header {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+
+  .channel-section {
+    padding: 8px 10px;
+  }
+
+  .section-title {
+    margin: 8px 0 6px;
+    font-size: 11px;
+  }
+
+  .channel {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 14px;
+  }
+
+  .voice-user-item {
+    min-height: 24px;
+    font-size: 12px;
+  }
+
+  .voice-connection-card {
+    margin: 8px 10px 10px;
+    padding: 8px 10px;
+  }
+
+  .voice-leave-button {
+    min-height: 34px;
+  }
+
   .main {
     min-height: 0;
     overflow: hidden;
+  }
+
+  .topbar {
+    height: 48px;
+    padding: 0 12px;
   }
 
   .voice-main .content,
@@ -1268,13 +1353,49 @@ button {
   .voice-chat-pane {
     width: 100%;
     max-width: none;
-    height: min(34dvh, 260px);
+    height: min(30dvh, 230px);
     border-left: 0;
     border-top: 1px solid #3f4147;
   }
 
   .chat {
     height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+
+  .messages {
+    padding: 12px 10px;
+  }
+
+  .message-group {
+    margin-top: 14px !important;
+  }
+
+  .message-header {
+    gap: 8px;
+  }
+
+  .chat-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: 13px;
+  }
+
+  .message-row {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .message-content {
+    font-size: 14px;
+    line-height: 21px;
+  }
+
+  .message-time-hover {
+    font-size: 9px;
+    line-height: 21px;
+    opacity: .6;
   }
 
   .composer {
@@ -1284,7 +1405,10 @@ button {
 
   .composer textarea {
     min-height: 46px;
+    max-height: 132px;
     padding: 12px 13px;
+    font-size: 14px;
+    line-height: 20px;
   }
 
   .composer button {
@@ -1307,16 +1431,62 @@ button {
 
   .home-panel {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
   }
 
   .home-sidebar {
-    max-height: 260px;
+    max-height: 176px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 
+  .home-tabs {
+    padding: 8px;
+  }
+
+  .home-tab {
+    min-height: 36px;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .dm-list {
+    padding: 8px;
+  }
+
+  .dm-list-item {
+    grid-template-columns: 30px minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .home-main,
+  .direct-chat {
+    min-height: 0;
+  }
+
+  .direct-header {
+    padding: 10px 12px;
+  }
+
+  .direct-messages {
+    padding: 12px 10px;
+  }
+
   .direct-message {
-    max-width: 88%;
+    max-width: 92%;
+  }
+
+  .direct-composer {
+    padding-top: 0;
+  }
+
+  .utility-panel,
+  .friends-home {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding: 14px;
   }
 }
 

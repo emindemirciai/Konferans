@@ -18,6 +18,36 @@ type VoicePolicy = {
 
 type VoiceToken = { token: string; roomName: string; wsUrl: string; policy: VoicePolicy };
 type Settings = { pushToTalkEnabled?: boolean; pushToTalkKey?: string; startMuted?: boolean; cameraEnabledByDefault?: boolean; performanceMode?: boolean; lowPowerMode?: boolean; screenShareQuality?: 'LOW' | 'BALANCED' | 'HIGH' };
+type ScreenShareQuality = NonNullable<Settings['screenShareQuality']>;
+
+const liveKitRoomOptions = {
+  adaptiveStream: false,
+  dynacast: false,
+  publishDefaults: {
+    simulcast: false,
+    screenShareEncoding: { maxBitrate: 12_000_000, maxFramerate: 30 },
+    videoEncoding: { maxBitrate: 4_000_000, maxFramerate: 30 },
+  },
+} as any;
+
+const screenShareProfiles: Record<ScreenShareQuality, { capture: any; publish: any }> = {
+  LOW: {
+    capture: { audio: false, frameRate: 20, resolution: { width: 1280, height: 720 } },
+    publish: { simulcast: false, videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 20 }, degradationPreference: 'maintain-resolution' },
+  },
+  BALANCED: {
+    capture: { audio: false, frameRate: 30, resolution: { width: 1920, height: 1080 } },
+    publish: { simulcast: false, videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 30 }, degradationPreference: 'maintain-resolution' },
+  },
+  HIGH: {
+    capture: { audio: false, frameRate: 30, resolution: { width: 2560, height: 1440 } },
+    publish: { simulcast: false, videoEncoding: { maxBitrate: 12_000_000, maxFramerate: 30 }, degradationPreference: 'maintain-resolution' },
+  },
+};
+
+function screenShareProfile(quality?: Settings['screenShareQuality']) {
+  return screenShareProfiles[quality || 'HIGH'];
+}
 
 function requestVoiceLayoutFullscreen() {
   const target = document.querySelector('.voice-layout') as HTMLElement | null;
@@ -184,7 +214,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
       connect
       audio={!voice.policy.serverMuted && !settings.startMuted}
       video={Boolean(settings.cameraEnabledByDefault && voice.policy.allowVideo)}
-      options={{ adaptiveStream: true, dynacast: true }}
+      options={liveKitRoomOptions}
       data-lk-theme="default"
       onDisconnected={scheduleReconnect}
       className={`voice ${settings.performanceMode ? 'voice-performance' : ''} ${isCinematic ? 'voice-cinematic' : ''} ${isLocalScreenSharing ? 'voice-screen-sharing' : ''}`}
@@ -209,7 +239,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
               <LocalScreenShareBadge visible={isLocalScreenSharing} />
             </div>
             <div className="voice-stage-right">
-              <ScreenSelectionControl visible={isLocalScreenSharing} isSharing={isLocalScreenSharing} surface="stage" />
+              <ScreenSelectionControl visible={isLocalScreenSharing} isSharing={isLocalScreenSharing} surface="stage" screenShareQuality={settings.screenShareQuality} />
               <button className="voice-action-button" title="Sinematik mod" onClick={toggleCinematic}>
                 {isCinematic ? <Minimize size={18} /> : <MonitorPlay size={18} />}
                 <span>{isCinematic ? 'Sinematikten çık' : 'Sinematik mod'}</span>
@@ -221,7 +251,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
             </div>
           </div>
           <div className="voice-stage">
-            <VoiceConference onLeaveChannel={leaveChannel} />
+            <VoiceConference onLeaveChannel={leaveChannel} settings={settings} />
           </div>
           <GameVoiceControls channelId={channel.id} settings={settings} policy={voice.policy} />
         </>
@@ -230,7 +260,7 @@ export function VoiceRoom({ token, channel }: { token: string; channel: { id: st
   );
 }
 
-function VoiceConference({ onLeaveChannel }: { onLeaveChannel: () => void }) {
+function VoiceConference({ onLeaveChannel, settings }: { onLeaveChannel: () => void; settings: Settings }) {
   const tracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: true },
     { source: Track.Source.ScreenShare, withPlaceholder: false },
@@ -265,7 +295,7 @@ function VoiceConference({ onLeaveChannel }: { onLeaveChannel: () => void }) {
       </div>
       <div className="custom-control-row">
         <ControlBar controls={{ microphone: true, camera: true, screenShare: false, chat: false, settings: false, leave: false }} />
-        <ScreenSelectionControl visible={!localScreenShare} isSharing={false} surface="control" />
+        <ScreenSelectionControl visible={!localScreenShare} isSharing={false} surface="control" screenShareQuality={settings.screenShareQuality} />
         <StopScreenShareControl visible={Boolean(localScreenShare)} />
         <button className="lk-button manual-screen-share-button voice-control-leave-button" title="Kanaldan ayrıl" onClick={onLeaveChannel}>
           <PhoneOff size={18} />
@@ -393,7 +423,7 @@ function LiveLocalScreenSharePreview({ trackRef }: { trackRef: TrackReference })
         const previewBounds = canvas.parentElement?.getBoundingClientRect();
         const cssWidth = Math.max(1, Math.floor(previewBounds?.width || canvas.clientWidth || window.innerWidth));
         const cssHeight = Math.max(1, Math.floor(previewBounds?.height || canvas.clientHeight || window.innerHeight));
-        const bitmapScale = Math.max(.5, Math.min(window.devicePixelRatio || 1, 1920 / cssWidth, 1080 / cssHeight));
+        const bitmapScale = Math.max(.5, Math.min(window.devicePixelRatio || 1, 2560 / cssWidth, 1440 / cssHeight));
         const targetWidth = Math.max(1, Math.round(cssWidth * bitmapScale));
         const targetHeight = Math.max(1, Math.round(cssHeight * bitmapScale));
         const sourceWidth = video.videoWidth;
@@ -499,7 +529,7 @@ function LocalScreenShareBadge({ visible }: { visible: boolean }) {
   );
 }
 
-function ScreenSelectionControl({ visible, isSharing, surface }: { visible: boolean; isSharing: boolean; surface: 'stage' | 'control' }) {
+function ScreenSelectionControl({ visible, isSharing, surface, screenShareQuality }: { visible: boolean; isSharing: boolean; surface: 'stage' | 'control'; screenShareQuality?: Settings['screenShareQuality'] }) {
   const { localParticipant } = useLocalParticipant();
   const [isSwitching, setIsSwitching] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -520,7 +550,8 @@ function ScreenSelectionControl({ visible, isSharing, surface }: { visible: bool
       if (isSharing) {
         await localParticipant.setScreenShareEnabled(false);
       }
-      await localParticipant.setScreenShareEnabled(true);
+      const profile = screenShareProfile(screenShareQuality);
+      await localParticipant.setScreenShareEnabled(true, profile.capture, profile.publish);
     } catch {
       // The browser closes the picker as an exception if the user cancels.
     } finally {

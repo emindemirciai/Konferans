@@ -343,6 +343,19 @@ export function AppShell() {
     await openServer(token, activeServer.server.id, activeChannel?.id);
   }
 
+  async function handleServerDeleted(serverId: string) {
+    if (!token) return;
+    setServers((current) => current.filter((server) => server.id !== serverId));
+    setActiveServer(null);
+    setActiveChannel(null);
+    setPanel('messages');
+    setChannelMenu(null);
+    setMemberMenu(null);
+    setVoiceUserMenu(null);
+    const data = await api<{ servers: Server[] }>('/servers', { token }).catch(() => null);
+    if (data) setServers(data.servers);
+  }
+
   async function openServer(t: string, serverId: string, preferredChannelId?: string) {
     const detail = await api<ServerDetail>(`/servers/${serverId}`, { token: t });
     setActiveServer(detail);
@@ -527,14 +540,14 @@ export function AppShell() {
   const isVoicePanel = panel === 'chat' && activeChannel?.type === 'VOICE';
 
   return (
-    <div className={`app ${compactMode ? 'compact-mode' : ''} ${cinematicMode ? 'cinematic-mode' : ''} ${fullscreenMode ? 'fullscreen-mode' : ''}`}>
+    <div className={`app ${compactMode ? 'compact-mode' : ''} ${cinematicMode ? 'cinematic-mode' : ''} ${fullscreenMode ? 'fullscreen-mode' : ''} ${isVoicePanel ? 'voice-panel-active' : ''}`}>
       <aside className="serverbar">
         <button className={`server-pill ${activeServer === null ? 'active' : ''}`} onClick={() => { setActiveServer(null); setPanel('messages'); }} title="Ana Sayfa" style={{ flexShrink: 0 }}>
           <Home size={22} />
         </button>
-        <div style={{ width: '32px', height: '2px', backgroundColor: '#3f4147', margin: '0 auto 8px', borderRadius: '1px', flexShrink: 0 }} />
+        <div className="serverbar-divider" style={{ width: '32px', height: '2px', backgroundColor: '#3f4147', margin: '0 auto 8px', borderRadius: '1px', flexShrink: 0 }} />
         
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center', scrollbarWidth: 'none' }}>
+        <div className="serverbar-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center', scrollbarWidth: 'none' }}>
           {servers.map((server) => (
             <button key={server.id} className={`server-pill ${activeServer?.server.id === server.id ? 'active' : ''}`} onClick={() => openServer(token, server.id)} title={server.name} style={{ flexShrink: 0 }}>
               {server.name.slice(0, 2).toUpperCase()}
@@ -542,7 +555,7 @@ export function AppShell() {
           ))}
         </div>
         
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center', paddingTop: '8px' }}>
+        <div className="serverbar-actions" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', alignItems: 'center', paddingTop: '8px' }}>
           <button className="server-pill" onClick={createServer} title="Sunucu oluştur" style={{ flexShrink: 0 }}><Plus size={22} /></button>
           <button className="server-pill" onClick={joinInvite} title="Davet kodu ile katıl" style={{ flexShrink: 0 }}><UserPlus size={22} /></button>
         </div>
@@ -773,7 +786,7 @@ export function AppShell() {
           {panel === 'friends' && <FriendsPanel token={token} initialTab="friends" initialUser={directUser} onInitialUserConsumed={() => setDirectUser(null)} />}
           {panel === 'settings' && <SettingsPanel token={token} />}
           {panel === 'notifications' && <NotificationsPanel token={token} />}
-          {panel === 'admin' && activeServer && <ServerAdminPanel token={token} server={activeServer.server} role={activeServer.role} onChanged={refreshActiveServer} />}
+          {panel === 'admin' && activeServer && <ServerAdminPanel token={token} server={activeServer.server} role={activeServer.role} onChanged={refreshActiveServer} onDeleted={handleServerDeleted} />}
           {panel === 'integrations' && (activeServer ? <IntegrationsPanel token={token} server={activeServer.server} /> : <div className="utility-panel"><div className="panel-title">Site entegrasyonu</div><p className="panel-muted">Lütfen sol üstten bir sunucuya girdikten sonra Sunucu Yönetimi üzerinden bu panele ulaşın veya entegrasyonları ayarlamak istediğiniz sunucuyu seçin.</p></div>)}
         </div>
       </main>
